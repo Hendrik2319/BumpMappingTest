@@ -7,8 +7,10 @@ import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Point;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Random;
 import java.util.function.Consumer;
@@ -285,8 +287,7 @@ public class BumpMappingTest {
 		comp.setSelectedItem(selectedValue);
 		if (valueChanged!=null) comp.addActionListener(e->{
 			int i = comp.getSelectedIndex();
-			if (i<0) valueChanged.accept(null);
-			else valueChanged.accept(comp.getItemAt(i));
+			valueChanged.accept(i<0?null:comp.getItemAt(i));
 		});
 		return comp;
 	}
@@ -351,80 +352,214 @@ public class BumpMappingTest {
 				return n;
 			});
 		}),
-		Spikes(new Consumer<BumpMapping>() {
+		Noise(new Consumer<BumpMapping>() {
 			@Override
 			public void accept(BumpMapping bm) {
-				int size = 21;
-				double maxSpikeHeight = 50;
-				int spikeSize = 20;
-				int width = size*spikeSize;
-				Color[] defaultColors = new Color[] { Color.RED, Color.ORANGE, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.PINK, Color.MAGENTA, Color.LIGHT_GRAY };
-				
+				int width = 400;
+				int height = 300;
 				Random rnd = new Random();
-				Color[][] colors = new Color[size][size];
-				double[][] spikes = new double[size][size];
-				boolean[][] isCone = new boolean[size][size];
-				int colorRange = size-6;
-				for (int x=0; x<size; x++)
-					for (int y=0; y<size; y++) {
-						isCone[x][y] = rnd.nextBoolean();
-						spikes[x][y] = rnd.nextDouble();
-						if (x>=(size-colorRange)/2 && x<(size+colorRange)/2 && y>=(size-colorRange)/2 && y<(size+colorRange)/2)
-							colors[x][y] = defaultColors[Math.abs(rnd.nextInt())%defaultColors.length];
-						else colors[x][y] = null;
-					}
-				
-				bm.setNormalFunction(new net.schwarzbaer.image.BumpMapping.NormalFunction() {
-					@Override
-					public Normal getNormal(int x_, int y_, int width_, int height_) {
-						int x = x_-(width_ /2-width/2);
-						int y = y_-(height_/2-width/2);
-						if (x<0 || x>=width || y<0 || y>=width)
-							return new Normal(0,0,1);
-						
-						int xS = x%spikeSize;
-						int yS = y%spikeSize;
-						Color color = colors[x/spikeSize][y/spikeSize];
-						double spikeHeight = spikes[x/spikeSize][y/spikeSize]*maxSpikeHeight;
-						
-						if (isCone[x/spikeSize][y/spikeSize]) {
-							
-							double m = (spikeSize-1)*0.5;
-							double w = Math.atan2(yS-m, xS-m);
-							double r = Math.sqrt((yS-m)*(yS-m)+(xS-m)*(xS-m));
-							if (r>m)
-								return new Normal(0,0,1,color);
-							else
-								return new Normal( spikeHeight,0,spikeSize, color ).rotateZ(w).normalize();
-							
-						} else {
-							
-							if (xS==0 || yS==0)
-								return new Normal(0,0,1,color);
-							//if (xS==yS || xS+yS==spikeSize)
-							//	return new Vector3D( 0,0,1);
-							
-							boolean leftOrTop = xS+yS<spikeSize;
-							boolean leftOrBottom = xS<yS;
-							
-							if (leftOrTop) {
-								if (leftOrBottom) return new Normal( -spikeHeight,0,spikeSize, color ).normalize(); // left
-								else              return new Normal( 0,-spikeHeight,spikeSize, color ).normalize(); // top
-							} else {
-								if (leftOrBottom) return new Normal( 0,spikeHeight,spikeSize, color ).normalize(); // bottom
-								else              return new Normal( spikeHeight,0,spikeSize, color ).normalize(); // right
-							}
-							
-						}
-					}
-				});
-
+				Normal[][] normalMap = new Normal[width ][height ];
+				for (int x1=0; x1<width; ++x1)
+					for (int y1=0; y1<height; ++y1)
+						normalMap[x1][y1] = new Normal(rnd.nextDouble(),0,1).normalize().rotateZ(rnd.nextDouble()*Math.PI*2);
+				bm .setNormalMap(normalMap);
 			}
+		}),
+		NoiseHeight1(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,   10).heightMap,0)),
+		NoiseHeight2(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,    5).heightMap,0)),
+		NoiseHeight3(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,    2).heightMap,0)),
+		NoiseHeight4(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,    1).heightMap,0)),
+		NoiseHeight5(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0)),
+		NoiseHeight6(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.25f)),
+		NoiseHeight7(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.5f)),
+		NoiseHeight8(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.75f)),
+		RandomHeight1(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.25f).heightMap,0)),
+		RandomHeight2(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.50f).heightMap,0)),
+		RandomHeight3(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.75f).heightMap,0)),
+		RandomHeight4(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 1.00f).heightMap,0)),
+		RandomHeight5(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 2.00f).heightMap,0)),
+		RandomHeightNColor1(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor2(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor3(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor4(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor5(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		Spikes(bm -> {
+			int size = 21;
+			double maxSpikeHeight = 50;
+			int spikeSize = 20;
+			int width = size*spikeSize;
+			Color[] defaultColors = new Color[] { Color.RED, Color.ORANGE, Color.YELLOW, Color.GREEN, Color.CYAN, Color.BLUE, Color.PINK, Color.MAGENTA, Color.LIGHT_GRAY };
+			
+			Random rnd = new Random();
+			Color[][] colors = new Color[size][size];
+			double[][] spikes = new double[size][size];
+			boolean[][] isCone = new boolean[size][size];
+			int colorRange = size-6;
+			for (int x=0; x<size; x++)
+				for (int y=0; y<size; y++) {
+					isCone[x][y] = rnd.nextBoolean();
+					spikes[x][y] = rnd.nextDouble();
+					if (x>=(size-colorRange)/2 && x<(size+colorRange)/2 && y>=(size-colorRange)/2 && y<(size+colorRange)/2)
+						colors[x][y] = defaultColors[Math.abs(rnd.nextInt())%defaultColors.length];
+					else colors[x][y] = null;
+				}
+			
+			bm.setNormalFunction((net.schwarzbaer.image.BumpMapping.NormalFunction) (x_, y_, width_, height_) -> {
+				int x = x_-(width_ /2-width/2);
+				int y = y_-(height_/2-width/2);
+				if (x<0 || x>=width || y<0 || y>=width)
+					return new Normal(0,0,1);
+				
+				int xS = x%spikeSize;
+				int yS = y%spikeSize;
+				Color color = colors[x/spikeSize][y/spikeSize];
+				double spikeHeight = spikes[x/spikeSize][y/spikeSize]*maxSpikeHeight;
+				
+				if (isCone[x/spikeSize][y/spikeSize]) {
+					
+					double m = (spikeSize-1)*0.5;
+					double w = Math.atan2(yS-m, xS-m);
+					double r = Math.sqrt((yS-m)*(yS-m)+(xS-m)*(xS-m));
+					if (r>m)
+						return new Normal(0,0,1,color);
+					else
+						return new Normal( spikeHeight,0,spikeSize, color ).rotateZ(w).normalize();
+					
+				} else {
+					
+					if (xS==0 || yS==0)
+						return new Normal(0,0,1,color);
+					//if (xS==yS || xS+yS==spikeSize)
+					//	return new Vector3D( 0,0,1);
+					
+					boolean leftOrTop = xS+yS<spikeSize;
+					boolean leftOrBottom = xS<yS;
+					
+					if (leftOrTop) {
+						if (leftOrBottom) return new Normal( -spikeHeight,0,spikeSize, color ).normalize(); // left
+						else              return new Normal( 0,-spikeHeight,spikeSize, color ).normalize(); // top
+					} else {
+						if (leftOrBottom) return new Normal( 0,spikeHeight,spikeSize, color ).normalize(); // bottom
+						else              return new Normal( spikeHeight,0,spikeSize, color ).normalize(); // right
+					}
+					
+				}
+			});
+
 		}),
 		;
 		Consumer<BumpMapping> setNormalFunction;
 		NormalFunction(Consumer<BumpMapping> setNormalFunction) {
 			this.setNormalFunction = setNormalFunction;
+		}
+	}
+	
+	private static class NoiseHeightMap {
+		
+		private Random rnd;
+		private float[][] heightMap = null;
+		@SuppressWarnings("unused")
+		private Color[][] colorMap  = null;
+		
+		NoiseHeightMap(int width, int height, long seed, float maxHeight) {
+			rnd = new Random(seed);
+			heightMap = new float[width][height];
+			for (int x=0; x<width; x++)
+				for (int y=0; y<height; y++)
+					heightMap[x][y] = rnd.nextFloat()*maxHeight;
+		}
+		@SuppressWarnings("unused")
+		NoiseHeightMap(int width, int height, long seed, float maxHeight, Color min, Color max) {
+			this(width, height, seed, maxHeight);
+			colorMap = RandomHeightMap.getColorMap(heightMap, min, max);
+		}
+	}
+	
+	private static class RandomHeightMap {
+		
+		private Random rnd;
+		private float[][] heightMap = null;
+		private Color[][] colorMap  = null;
+		private float variance;
+		
+		RandomHeightMap(int width, int height, long seed, float variance) {
+			this.variance = variance;
+			rnd = new Random(seed);
+			heightMap = new float[width][height];
+			for (float[] col:heightMap) Arrays.fill(col, Float.NaN);
+			heightMap[      0][       0] = rnd.nextFloat()*Math.min(width,height);
+			heightMap[width-1][       0] = rnd.nextFloat()*Math.min(width,height);
+			heightMap[      0][height-1] = rnd.nextFloat()*Math.min(width,height);
+			heightMap[width-1][height-1] = rnd.nextFloat()*Math.min(width,height);
+			setHeight(0,0,width-1,height-1);
+		}
+		
+		RandomHeightMap(int width, int height, long seed, float variance, Color min, Color max) {
+			this(width, height, seed, variance);
+			colorMap = getColorMap(heightMap, min, max);
+		}
+
+		static Color[][] getColorMap(float[][] heightMap, Color min, Color max) {
+			int width = heightMap.length;
+			int height = heightMap[0].length; 
+			float minH = heightMap[0][0];
+			float maxH = minH;
+			for (float[] col:heightMap)
+				for (float h:col) {
+					minH = Math.min(h, minH);
+					maxH = Math.max(h, maxH);
+				}
+			Color[][] colorMap = new Color[width][height];
+			for (int x=0; x<width; x++) {
+				for (int y=0; y<height; y++) {
+					float f = (heightMap[x][y]-minH)/(maxH-minH);
+					colorMap[x][y] = new Color(
+						Math.round(max.getRed  ()*f + min.getRed  ()*(1-f)),
+						Math.round(max.getGreen()*f + min.getGreen()*(1-f)),
+						Math.round(max.getBlue ()*f + min.getBlue ()*(1-f))
+					);
+				}
+			}
+			return colorMap;
+		}
+
+		private void setHeight(int minX, int minY, int maxX, int maxY) {
+			if (minX==maxX || minY==maxY || (minX+1==maxX && minY+1==maxY)) return;
+			
+			int midX = (maxX+minX)/2;
+			int midY = (maxY+minY)/2;
+			//midX = Math.round( (maxX+minX)/2f + (maxX-minX)/3f * (rnd.nextFloat()-0.5f) );
+			//midY = Math.round( (maxY+minY)/2f + (maxY-minY)/3f * (rnd.nextFloat()-0.5f) );
+			//midX = Math.max(minX, Math.min(midX, maxX));
+			//midY = Math.max(minY, Math.min(midY, maxY));
+			
+			Point xy = new Point(minX,minY);
+			Point xm = new Point(minX,midY);
+			Point xY = new Point(minX,maxY);
+			Point Xy = new Point(maxX,minY);
+			Point Xm = new Point(maxX,midY);
+			Point XY = new Point(maxX,maxY);
+			Point my = new Point(midX,minY);
+			Point mY = new Point(midX,maxY);
+			
+			setMid(my, maxX-minX, xy, Xy );
+			setMid(mY, maxX-minX, xY, XY );
+			setMid(xm, maxY-minY, xy, xY );
+			setMid(Xm, maxY-minY, Xy, XY );
+			setMid(new Point(midX,midY), Math.min(maxY-minY,maxX-minX), my, mY, xm, Xm );
+			
+			setHeight(minX, minY, midX, midY);
+			setHeight(midX, minY, maxX, midY);
+			setHeight(minX, midY, midX, maxY);
+			setHeight(midX, midY, maxX, maxY);
+		}
+
+		private void setMid(Point p, float length, Point... points) {
+			if (Float.isNaN(heightMap[p.x][p.y]) && points.length>0) {
+				float sum = 0;
+				for (Point p1:points) sum += heightMap[p1.x][p1.y];
+				heightMap[p.x][p.y] = sum/points.length + (rnd.nextFloat()-0.5f)*length*variance;
+			}
 		}
 	}
 	
