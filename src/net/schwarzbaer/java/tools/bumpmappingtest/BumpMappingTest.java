@@ -42,11 +42,6 @@ public class BumpMappingTest {
 	public static void main(String[] args) {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
-		
-		double a;
-		a =  13.45; System.out.printf("floor(%f) -> %f",a,Math.floor(a));
-		a = -13.45; System.out.printf("floor(%f) -> %f",a,Math.floor(a));
-		
 		new BumpMappingTest().createGUI();
 	}
 
@@ -62,7 +57,7 @@ public class BumpMappingTest {
 		mainwindow = new StandardMainWindow("BumpMappingTest");
 		
 		sun = new Normal(1,-1,2).normalize();
-		NormalFunction initialNormalFunction = NormalFunction.Spirale; // HemiSphereBubblesT;
+		NormalFunction initialNormalFunction = NormalFunction.HemiSphereBubblesT;
 		Shading initialShading = Shading.Material;
 		
 		bumpMapping = new BumpMapping(true);
