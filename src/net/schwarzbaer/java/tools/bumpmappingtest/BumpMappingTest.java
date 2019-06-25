@@ -10,9 +10,11 @@ import java.awt.Insets;
 import java.awt.Point;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
+import java.awt.geom.Point2D;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Random;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
@@ -30,6 +32,7 @@ import net.schwarzbaer.gui.HSColorChooser;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.image.BumpMapping;
 import net.schwarzbaer.image.BumpMapping.Normal;
+import net.schwarzbaer.image.BumpMapping.NormalFunctionPolar;
 import net.schwarzbaer.image.BumpMapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MaterialShading;
 import net.schwarzbaer.image.BumpMapping.Shading.NormalImage;
@@ -39,6 +42,10 @@ public class BumpMappingTest {
 	public static void main(String[] args) {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
+		
+		double a;
+		a =  13.45; System.out.printf("floor(%f) -> %f",a,Math.floor(a));
+		a = -13.45; System.out.printf("floor(%f) -> %f",a,Math.floor(a));
 		
 		new BumpMappingTest().createGUI();
 	}
@@ -55,7 +62,7 @@ public class BumpMappingTest {
 		mainwindow = new StandardMainWindow("BumpMappingTest");
 		
 		sun = new Normal(1,-1,2).normalize();
-		NormalFunction initialNormalFunction = NormalFunction.HemiSphere;
+		NormalFunction initialNormalFunction = NormalFunction.Spirale; // HemiSphereBubblesT;
 		Shading initialShading = Shading.Material;
 		
 		bumpMapping = new BumpMapping(true);
@@ -337,67 +344,75 @@ public class BumpMappingTest {
 				}
 			);
 		}),
+		Spirale(bm->{
+			bm.setNormalFunction(new NormalFunctionPolar() {
+				@Override
+				public Normal getNormal(double w, double r) {
+					double pAmpl = 60;
+					double rAmpl = r + w*pAmpl/Math.PI;
+					double pSpir = 5;
+					double rSpir = r + w*pSpir/Math.PI;
+					double ampl = Math.sin(rAmpl/pAmpl*Math.PI); ampl *= ampl;
+					double spir = Math.sin(rSpir/pSpir*Math.PI) * ampl*ampl;
+					double f = 0.9; // 0.7; // 1; // 1/Math.sqrt(2); 
+					return new Normal(f*spir,0,Math.sqrt(1-f*f*spir*spir)).normalize().rotateZ(w);
+				}
+			});
+		}),
 		HemiSphere(bm->{
 			Normal vFace  = new Normal( 0,0,1);
-			int radius = 100;
+			double radius = 100;
+			double transition = 3;
 			bm.setNormalFunction((double w,double r)->{
 				Normal n;
 				if (r < radius)
 					n = new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
-				else if (r<radius+3)
-					n = Normal.blend(r, radius, radius+3, new Normal(1,0,0), vFace).normalize().rotateZ(w);
-				else
-					n = vFace;
+				else {
+					if (r<radius+transition)
+						n = Normal.blend(r, radius, radius+transition, new Normal(1,0,0), vFace).normalize().rotateZ(w);
+					else
+						n = vFace;
+				}
 				return n;
 			});
 		}),
-		HemiSphereBubbles(new Consumer<BumpMapping>() {
-			@Override public void accept(BumpMapping bm) {
-				Normal vFace  = new Normal( 0,0,1);
-				double raster = 12.7;
-				double radiusB = 3.7;
-				double transitionB = 2.3;
-				double transition = 3;
-				double radius = raster*8-radiusB-transitionB-transition;
-				bm.setNormalFunction(new BumpMapping.NormalFunction() {
-					@Override public Normal getNormal(int x, int y, int width, int height) {
-						double xC = x-width/2.0;
-						double yC = y-height/2.0;
-						
-						//Normal n = getBubbleNormal(xC,yC, radius, transition, vFace);
-						
-						double w = Math.atan2(yC,xC);
-						double r = Math.sqrt(xC*xC+yC*yC);
-						
-						if (r < radius) // HemiSphere
-							return new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
-						
-						if (r<radius+transition) // Transition
-							return Normal.blend(r, radius, radius+transition, new Normal(1,0,0), vFace).normalize().rotateZ(w);
-						
-						double xM = Math.round(xC/raster)*raster;
-						double yM = Math.round(yC/raster)*raster;
-						double rM = Math.sqrt(xM*xM+yM*yM);
-						
-						if (rM < radius+transition+radiusB+transitionB)
-							return vFace;
-						
-						xC = xC-xM;
-						yC = yC-yM;
-						r = Math.sqrt(xC*xC+yC*yC);
-						
-						if (r > radiusB+transitionB)
-							return vFace;
-						
-						w = Math.atan2(yC,xC);
-						
-						if (r < radiusB)
-							return new Normal(r,0,Math.sqrt(radiusB*radiusB-r*r)).normalize().rotateZ(w);
-						else
-							return Normal.blend(r, radiusB, radiusB+transitionB, new Normal(1,0,0), vFace).normalize().rotateZ(w);
-					}
-				});
-			}
+		HemiSphere2(bm->{
+			Normal vFace  = new Normal( 0,0,1);
+			bm.setNormalFunction((x,y,width,height)->{
+				Normal n = NormalFunction.getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
+				if (n!=null) return n;
+				return vFace;
+			});
+		}),
+		HemiSphereBubblesQ(bm -> {
+			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p)->{
+				p.x = Math.round(p.x/raster)*raster;
+				p.y = Math.round(p.y/raster)*raster;
+			}));
+		}),
+		HemiSphereBubblesT(bm -> {
+			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p) -> {
+				double f3 = p.y/(raster*Math.sin(Math.PI/3));
+				double f2 = p.x/raster-f3/2;
+				double f1 = 1-f2-f3;
+				
+				double f3F = f3-Math.floor(f3);
+				double f2F = f2-Math.floor(f2);
+				double f1F = f1-Math.floor(f1);
+				
+				if (f1F+f2F+f3F<1.5) {
+					if (f1F> f2F && f1F> f3F) { f1 = Math.ceil(f1); f2 = Math.floor(f2); f3 = Math.floor(f3); }
+					if (f2F>=f1F && f2F> f3F) { f2 = Math.ceil(f2); f1 = Math.floor(f1); f3 = Math.floor(f3); }
+					if (f3F>=f1F && f3F>=f2F) { f3 = Math.ceil(f3); f1 = Math.floor(f1); f2 = Math.floor(f2); }
+				} else {
+					if (f1F< f2F && f1F< f3F) { f1 = Math.floor(f1); f2 = Math.ceil(f2); f3 = Math.ceil(f3); }
+					if (f2F<=f1F && f2F< f3F) { f2 = Math.floor(f2); f1 = Math.ceil(f1); f3 = Math.ceil(f3); }
+					if (f3F<=f1F && f3F<=f2F) { f3 = Math.floor(f3); f1 = Math.ceil(f1); f2 = Math.ceil(f2); }
+				}
+				
+				p.y = f3*(raster*Math.sin(Math.PI/3));
+				p.x = raster*(f2+f3/2);
+			}));
 		}),
 		Noise(bm -> {
 			int width = 400;
@@ -443,27 +458,27 @@ public class BumpMappingTest {
 			double[][] spikes = new double[size][size];
 			boolean[][] isCone = new boolean[size][size];
 			int colorRange = size-6;
-			for (int x=0; x<size; x++)
-				for (int y=0; y<size; y++) {
-					isCone[x][y] = rnd.nextBoolean();
-					spikes[x][y] = rnd.nextDouble();
-					if (x>=(size-colorRange)/2 && x<(size+colorRange)/2 && y>=(size-colorRange)/2 && y<(size+colorRange)/2)
-						colors[x][y] = defaultColors[Math.abs(rnd.nextInt())%defaultColors.length];
-					else colors[x][y] = null;
+			for (int x1=0; x1<size; x1++)
+				for (int y1=0; y1<size; y1++) {
+					isCone[x1][y1] = rnd.nextBoolean();
+					spikes[x1][y1] = rnd.nextDouble();
+					if (x1>=(size-colorRange)/2 && x1<(size+colorRange)/2 && y1>=(size-colorRange)/2 && y1<(size+colorRange)/2)
+						colors[x1][y1] = defaultColors[Math.abs(rnd.nextInt())%defaultColors.length];
+					else colors[x1][y1] = null;
 				}
 			
-			bm.setNormalFunction((net.schwarzbaer.image.BumpMapping.NormalFunction) (x_, y_, width_, height_) -> {
-				int x = x_-(width_ /2-width/2);
-				int y = y_-(height_/2-width/2);
-				if (x<0 || x>=width || y<0 || y>=width)
+			bm.setNormalFunction((x_, y_, width_, height_) -> {
+				int x2 = x_-(width_ /2-width/2);
+				int y2 = y_-(height_/2-width/2);
+				if (x2<0 || x2>=width || y2<0 || y2>=width)
 					return new Normal(0,0,1);
 				
-				int xS = x%spikeSize;
-				int yS = y%spikeSize;
-				Color color = colors[x/spikeSize][y/spikeSize];
-				double spikeHeight = spikes[x/spikeSize][y/spikeSize]*maxSpikeHeight;
+				int xS = x2%spikeSize;
+				int yS = y2%spikeSize;
+				Color color = colors[x2/spikeSize][y2/spikeSize];
+				double spikeHeight = spikes[x2/spikeSize][y2/spikeSize]*maxSpikeHeight;
 				
-				if (isCone[x/spikeSize][y/spikeSize]) {
+				if (isCone[x2/spikeSize][y2/spikeSize]) {
 					
 					double m = (spikeSize-1)*0.5;
 					double w = Math.atan2(yS-m, xS-m);
@@ -501,7 +516,7 @@ public class BumpMappingTest {
 			this.setNormalFunction = setNormalFunction;
 		}
 		
-		private static Normal getBubbleNormal(double xCenter, double yCenter, double radius, double transition, Normal face) {
+		static Normal getBubbleNormal(double xCenter, double yCenter, double radius, double transition, Normal face, boolean inverted) {
 			double r = Math.sqrt(xCenter*xCenter+yCenter*yCenter);
 			
 			if (r > radius+transition)
@@ -510,9 +525,62 @@ public class BumpMappingTest {
 			double w = Math.atan2(yCenter,xCenter);
 			
 			if (r < radius)
-				return new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
+				return new Normal(inverted?-r:r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
 			else
-				return Normal.blend(r, radius, radius+transition, new Normal(1,0,0), face).normalize().rotateZ(w);
+				return Normal.blend(r, radius, radius+transition, new Normal(inverted?-1:1,0,0), face).normalize().rotateZ(w);
+		}
+	}
+	
+	private static class BubbleRaster implements BumpMapping.NormalFunction {
+		
+		private Normal vFace;
+		
+		private double raster;
+		private double radius;
+		private double transition;
+		private double radiusB;
+		private double transitionB;
+		
+		private BiConsumer<Double,Point2D.Double> getRasterPoint;
+		private Point2D.Double rasterPoint;
+
+		private BubbleRaster(double radius, double transition, BiConsumer<Double,Point2D.Double> getRasterPoint) {
+			this.getRasterPoint = getRasterPoint;
+			
+			int n = 8;
+			this.radius = radius;
+			this.transition = transition;
+			raster = (radius+transition)/(n-0.5)+0.001;
+			transitionB = 2.1;
+			radiusB = raster/2-transitionB;
+			
+			rasterPoint = new Point2D.Double();
+			vFace = new Normal( 0,0,1);
+		}
+		
+		@Override public Normal getNormal(int x, int y, int width, int height) {
+			Normal n;
+			double xC = x-width/2.0;
+			double yC = y-height/2.0;
+			
+			n = NormalFunction.getBubbleNormal(xC,yC, radius, transition, vFace, false);
+			if (n!=null) return n;
+			
+			//double xM = Math.round(xC/raster)*raster;
+			//double yM = Math.round(yC/raster)*raster;
+			rasterPoint.x = xC;
+			rasterPoint.y = yC;
+			getRasterPoint.accept(raster,rasterPoint);
+			double xM = rasterPoint.x;
+			double yM = rasterPoint.y;
+			
+			if (Math.sqrt(xM*xM+yM*yM) < radius+transition+radiusB+transitionB)
+				return vFace;
+			
+			n = NormalFunction.getBubbleNormal(xC-xM,yC-yM, radiusB, transitionB, vFace, false);
+			if (n!=null) return n;
+			
+			return vFace;
 		}
 	}
 	
