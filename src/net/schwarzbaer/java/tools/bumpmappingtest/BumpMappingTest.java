@@ -29,10 +29,10 @@ import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.gui.HSColorChooser;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.image.BumpMapping;
+import net.schwarzbaer.image.BumpMapping.Normal;
 import net.schwarzbaer.image.BumpMapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MaterialShading;
 import net.schwarzbaer.image.BumpMapping.Shading.NormalImage;
-import net.schwarzbaer.image.BumpMapping.Normal;
 
 public class BumpMappingTest {
 
@@ -341,7 +341,6 @@ public class BumpMappingTest {
 			Normal vFace  = new Normal( 0,0,1);
 			int radius = 100;
 			bm.setNormalFunction((double w,double r)->{
-				new Normal(1,0,0).rotateZ(w);
 				Normal n;
 				if (r < radius)
 					n = new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
@@ -352,19 +351,65 @@ public class BumpMappingTest {
 				return n;
 			});
 		}),
-		Noise(new Consumer<BumpMapping>() {
-			@Override
-			public void accept(BumpMapping bm) {
-				int width = 400;
-				int height = 300;
-				Random rnd = new Random();
-				Normal[][] normalMap = new Normal[width ][height ];
-				for (int x1=0; x1<width; ++x1)
-					for (int y1=0; y1<height; ++y1)
-						normalMap[x1][y1] = new Normal(rnd.nextDouble(),0,1).normalize().rotateZ(rnd.nextDouble()*Math.PI*2);
-				bm .setNormalMap(normalMap);
+		HemiSphereBubbles(new Consumer<BumpMapping>() {
+			@Override public void accept(BumpMapping bm) {
+				Normal vFace  = new Normal( 0,0,1);
+				double raster = 12.7;
+				double radiusB = 3.7;
+				double transitionB = 2.3;
+				double transition = 3;
+				double radius = raster*8-radiusB-transitionB-transition;
+				bm.setNormalFunction(new BumpMapping.NormalFunction() {
+					@Override public Normal getNormal(int x, int y, int width, int height) {
+						double xC = x-width/2.0;
+						double yC = y-height/2.0;
+						
+						//Normal n = getBubbleNormal(xC,yC, radius, transition, vFace);
+						
+						double w = Math.atan2(yC,xC);
+						double r = Math.sqrt(xC*xC+yC*yC);
+						
+						if (r < radius) // HemiSphere
+							return new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
+						
+						if (r<radius+transition) // Transition
+							return Normal.blend(r, radius, radius+transition, new Normal(1,0,0), vFace).normalize().rotateZ(w);
+						
+						double xM = Math.round(xC/raster)*raster;
+						double yM = Math.round(yC/raster)*raster;
+						double rM = Math.sqrt(xM*xM+yM*yM);
+						
+						if (rM < radius+transition+radiusB+transitionB)
+							return vFace;
+						
+						xC = xC-xM;
+						yC = yC-yM;
+						r = Math.sqrt(xC*xC+yC*yC);
+						
+						if (r > radiusB+transitionB)
+							return vFace;
+						
+						w = Math.atan2(yC,xC);
+						
+						if (r < radiusB)
+							return new Normal(r,0,Math.sqrt(radiusB*radiusB-r*r)).normalize().rotateZ(w);
+						else
+							return Normal.blend(r, radiusB, radiusB+transitionB, new Normal(1,0,0), vFace).normalize().rotateZ(w);
+					}
+				});
 			}
 		}),
+		Noise(bm -> {
+			int width = 400;
+			int height = 300;
+			Random rnd = new Random();
+			Normal[][] normalMap = new Normal[width][height];
+			for (int x1=0; x1<width; ++x1)
+				for (int y1=0; y1<height; ++y1)
+					normalMap[x1][y1] = new Normal(rnd.nextDouble(),0,1).normalize().rotateZ(rnd.nextDouble()*Math.PI*2);
+			bm.setNormalMap(normalMap);
+		}),
+		
 		NoiseHeight1(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,   10).heightMap,0)),
 		NoiseHeight2(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,    5).heightMap,0)),
 		NoiseHeight3(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594,    2).heightMap,0)),
@@ -373,16 +418,19 @@ public class BumpMappingTest {
 		NoiseHeight6(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.25f)),
 		NoiseHeight7(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.5f)),
 		NoiseHeight8(bm -> bm.setHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.75f)),
+		
 		RandomHeight1(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.25f).heightMap,0)),
 		RandomHeight2(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.50f).heightMap,0)),
 		RandomHeight3(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.75f).heightMap,0)),
 		RandomHeight4(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 1.00f).heightMap,0)),
 		RandomHeight5(bm -> bm.setHeightMap(new RandomHeightMap(400, 300, 1594263594, 2.00f).heightMap,0)),
+		
 		RandomHeightNColor1(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
 		RandomHeightNColor2(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
 		RandomHeightNColor3(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
 		RandomHeightNColor4(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
 		RandomHeightNColor5(bm -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); bm.setHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		
 		Spikes(bm -> {
 			int size = 21;
 			double maxSpikeHeight = 50;
@@ -451,6 +499,20 @@ public class BumpMappingTest {
 		Consumer<BumpMapping> setNormalFunction;
 		NormalFunction(Consumer<BumpMapping> setNormalFunction) {
 			this.setNormalFunction = setNormalFunction;
+		}
+		
+		private static Normal getBubbleNormal(double xCenter, double yCenter, double radius, double transition, Normal face) {
+			double r = Math.sqrt(xCenter*xCenter+yCenter*yCenter);
+			
+			if (r > radius+transition)
+				return null;
+			
+			double w = Math.atan2(yCenter,xCenter);
+			
+			if (r < radius)
+				return new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
+			else
+				return Normal.blend(r, radius, radius+transition, new Normal(1,0,0), face).normalize().rotateZ(w);
 		}
 	}
 	
