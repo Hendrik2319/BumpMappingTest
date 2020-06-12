@@ -35,6 +35,7 @@ import net.schwarzbaer.image.BumpMapping.Normal;
 import net.schwarzbaer.image.BumpMapping.NormalFunctionPolar;
 import net.schwarzbaer.image.BumpMapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MaterialShading;
+import net.schwarzbaer.image.BumpMapping.Shading.MixedShading;
 import net.schwarzbaer.image.BumpMapping.Shading.NormalImage;
 
 public class BumpMappingTest {
@@ -66,7 +67,7 @@ public class BumpMappingTest {
 		resultView.setBorder(BorderFactory.createTitledBorder("Result"));
 		resultView.setPreferredSize(new Dimension(300,300));
 		
-		JTextField sunOutput = new JTextField(String.format(Locale.ENGLISH, "new Vector3D( %1.3f, %1.3f, %1.3f )", sun.x,sun.y,sun.z));
+		JTextField sunOutput = new JTextField(String.format(Locale.ENGLISH, "new Normal( %1.3f, %1.3f, %1.3f )", sun.x,sun.y,sun.z));
 		sunOutput.setEditable(false);
 		
 		BumpmappingSunControl directionControl = new BumpmappingSunControl(sun.x,sun.y,sun.z);
@@ -75,7 +76,7 @@ public class BumpMappingTest {
 			sun = new Normal(x,y,z);
 			bumpMapping.setSun(x,y,z);
 			resultView.repaint();
-			sunOutput.setText(String.format(Locale.ENGLISH, "new Vector3D( %1.3f, %1.3f, %1.3f )", x,y,z));
+			sunOutput.setText(String.format(Locale.ENGLISH, "new Normal( %1.3f, %1.3f, %1.3f )", x,y,z));
 		});
 		
 		JPanel rightPanel = new JPanel(new BorderLayout(3,3));
@@ -138,6 +139,8 @@ public class BumpMappingTest {
 				sh.valuePanel.add(new JLabel(),c);
 				break;
 			case NormalImage:
+				break;
+			case MixedShading:
 				break;
 			}
 		}
@@ -298,9 +301,10 @@ public class BumpMappingTest {
 		NormalImage(new NormalImage()),
 		GUISurface(new GUISurfaceShading(new Normal(1,-1,2).normalize(), Color.WHITE,new Color(0xf0f0f0),new Color(0x707070))),
 		Material(new MaterialShading(new Normal(1,-1,2).normalize(), Color.RED, 0, 40)),
+		MixedShading(new MixedShading((double w,double r)->50<=r && r<100 ? 0 : 1,Shading.Material.shading,Shading.GUISurface.shading))
 		;
 		public JPanel valuePanel;
-		private BumpMapping.Shading shading;
+		private final BumpMapping.Shading shading;
 		Shading(BumpMapping.Shading shading) {
 			this.shading = shading;
 			valuePanel = null;
@@ -329,15 +333,64 @@ public class BumpMappingTest {
 					int r3 = radius-15;
 					int r4 = radius;
 					if      (r1  <r && r<=r2  ) n = vInner;
-					else if (r3  <r && r<=r4  ) n = vOuter;
-					//else if (r1-2<r && r<=r1  ) n = Vector3D.blend(r, r1-2, r1  , vFace, vInner);
 					else if (r2  <r && r<=r2+2) n = Normal.blend(r, r2  , r2+2, vInner, vFace);
+					//else if (r1-2<r && r<=r1  ) n = Vector3D.blend(r, r1-2, r1  , vFace, vInner);
 					else if (r3-2<r && r<=r3  ) n = Normal.blend(r, r3-2, r3  , vFace, vOuter);
+					else if (r3  <r && r<=r4  ) n = vOuter;
 					//else if (r4  <r && r<=r4+2) n = Vector3D.blend(r, r4  , r4+2, vOuter, vFace);
 					else                        n = vFace;
 					return n.normalize().rotateZ(w);
 				}
 			);
+		}),
+		RotaryCtrl_CNF(bm -> {
+			int radius = 100;
+			int r1 = radius/2;
+			int r2 = radius/2+5;
+			int r3 = radius-15;
+			int r4 = radius;
+			Normal vFace  = new Normal( 0,0,1);
+			Normal vInner = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r1, r2, 0, 5);
+			Normal vOuter = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r3, r4, 5, 0);
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.Constant(0, r1),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant(r1  , r2  , 0, 5),
+				new BumpMapping.ConstructivePolarNormalFunction.Linear  (r2  , r2+2, vInner, vFace),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant(r2+2, r3-2),
+				new BumpMapping.ConstructivePolarNormalFunction.Linear  (r3-2, r3  , vFace, vOuter),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant(r3  , r4  , 5, 0),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant(r4  , Double.POSITIVE_INFINITY)
+			));
+		}),
+		RotaryCtrl_CNF2(new Consumer<BumpMapping>() {
+			@Override
+			public void accept(BumpMapping bm) {
+				double radius = 100;
+				double r1 = radius/2;
+				double r2 = radius/2+5;
+				double r3 = radius-15;
+				double r4 = radius;
+				double tr = 1.1;
+				Normal vFace  = new Normal(0,0,1);
+				Normal vInner = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r1, r2, 0, 5);
+				Normal vOuter = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r3, r4, 5, 0);
+				bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+					new BumpMapping.ConstructivePolarNormalFunction.Constant(   0.0, r1-tr ),
+					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r1-tr , r1    , vFace,new Normal(1,0,0)),
+					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r1    , r1+tr , new Normal(-1,0,0),vInner),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant(r1+tr , r2    , 0, 5),
+					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r2    , r2+2  , vInner, vFace),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant(r2+2  , r3-2  ),
+					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r3-2  , r3    , vFace, vOuter),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant(r3    , r4-tr , 5, 0),
+					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r4-tr , r4    , vOuter,new Normal(1,0,0)),
+					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r4    , r4+tr , new Normal(-1,0,0),vFace),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant(r4+tr , Double.POSITIVE_INFINITY)
+				).setColorizer((w,r)->{
+					if (r<r1 || r>r4) return null;
+					return Color.GREEN;
+				}));
+			}
 		}),
 		Spirale(bm->{
 			bm.setNormalFunction(new NormalFunctionPolar() {
@@ -378,6 +431,16 @@ public class BumpMappingTest {
 				if (n!=null) return n;
 				return vFace;
 			});
+		}),
+		HemiSphere_CNF(bm -> {
+			double transition = 3;
+			double r1 = 100;
+			double r2 = r1+transition;
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.Linear  ( 0, r1, new Normal(0,0,1), new Normal(1,0,0)),
+				new BumpMapping.ConstructivePolarNormalFunction.Linear  (r1, r2, new Normal(1,0,0), new Normal(0,0,1)),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant(r2, Double.POSITIVE_INFINITY)
+			));
 		}),
 		HemiSphereBubblesQ(bm -> {
 			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p)->{
