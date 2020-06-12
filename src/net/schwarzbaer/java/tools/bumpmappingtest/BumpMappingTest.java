@@ -72,7 +72,7 @@ public class BumpMappingTest {
 		BumpmappingSunControl directionControl = new BumpmappingSunControl(sun.x,sun.y,sun.z);
 		directionControl.setPreferredSize(new Dimension(300,300));
 		directionControl.addValueChangeListener((x,y,z)->{
-			sun.set(x,y,z);
+			sun = new Normal(x,y,z);
 			bumpMapping.setSun(x,y,z);
 			resultView.repaint();
 			sunOutput.setText(String.format(Locale.ENGLISH, "new Vector3D( %1.3f, %1.3f, %1.3f )", x,y,z));
