@@ -6,11 +6,21 @@ import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Point;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.Transferable;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.awt.event.ActionListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.geom.Point2D;
+import java.awt.image.BufferedImage;
+import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.Random;
@@ -20,9 +30,11 @@ import java.util.function.Consumer;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 
@@ -66,6 +78,16 @@ public class BumpMappingTest {
 		resultView = new ResultView(bumpMapping);
 		resultView.setBorder(BorderFactory.createTitledBorder("Result"));
 		resultView.setPreferredSize(new Dimension(300,300));
+		
+		JPanel buttonPanel = new JPanel(new GridLayout(1,0,3,3));
+		buttonPanel.add(createButton("Copy"   ,(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(1));}));
+		buttonPanel.add(createButton("Copy 2x",(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(2));}));
+		buttonPanel.add(createButton("Copy 4x",(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(4));}));
+		buttonPanel.add(createButton("Copy 8x",(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(8));}));
+		
+		JPanel resultViewPanel = new JPanel(new BorderLayout(3,3));
+		resultViewPanel.add(resultView,BorderLayout.CENTER);
+		resultViewPanel.add(buttonPanel,BorderLayout.SOUTH);
 		
 		JTextField sunOutput = new JTextField(String.format(Locale.ENGLISH, "new Normal( %1.3f, %1.3f, %1.3f )", sun.x,sun.y,sun.z));
 		sunOutput.setEditable(false);
@@ -151,10 +173,54 @@ public class BumpMappingTest {
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
 		contentPane.setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		contentPane.add(optionsPanel,BorderLayout.WEST);
-		contentPane.add(resultView,BorderLayout.CENTER);
+		contentPane.add(resultViewPanel,BorderLayout.CENTER);
 		contentPane.add(rightPanel,BorderLayout.EAST);
 		
 		mainwindow.startGUI(contentPane);
+	}
+
+	private void copyImageToClipboard(JComponent comp, BufferedImage image) {
+		new Thread(()->{
+			try { SwingUtilities.invokeAndWait(()->comp.setEnabled(false)); }
+			catch (InvocationTargetException | InterruptedException e) {}
+			
+			Toolkit toolkit = Toolkit.getDefaultToolkit();
+			Clipboard clipboard = toolkit.getSystemClipboard();
+			TransferableImage content = new TransferableImage(image);
+			//DataHandler content = new DataHandler(image,"image/x-java-image");
+			try { clipboard.setContents(content,null); }
+			catch (IllegalStateException e1) { e1.printStackTrace(); }
+			
+			SwingUtilities.invokeLater(()->comp.setEnabled(true));
+		}).start();
+	}
+	
+	private static class TransferableImage implements Transferable {
+
+		private BufferedImage image;
+		public TransferableImage(BufferedImage image) { this.image = image; }
+
+		@Override public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
+			if (isDataFlavorSupported(flavor)) return image;
+			throw new UnsupportedFlavorException( flavor );
+		}
+
+		@Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[] { DataFlavor.imageFlavor }; }
+		@Override public boolean isDataFlavorSupported(DataFlavor flavor) { return DataFlavor.imageFlavor.equals(flavor); }
+		
+	}
+	
+	@SuppressWarnings("unused")
+	private JButton createButton(String title, ActionListener al) {
+		JButton comp = new JButton(title);
+		if (al!=null) comp.addActionListener(al);
+		return comp;
+	}
+	
+	private JButton createButton(String title, Consumer<JButton> action) {
+		JButton comp = new JButton(title);
+		if (action!=null) comp.addActionListener(e->action.accept(comp));
+		return comp;
 	}
 	
 	private JTextField createDoubleTextField(double value, Consumer<Double> setValue) {
@@ -353,13 +419,13 @@ public class BumpMappingTest {
 			Normal vInner = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r1, r2, 0, 5);
 			Normal vOuter = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r3, r4, 5, 0);
 			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
-				new BumpMapping.ConstructivePolarNormalFunction.Constant(0, r1),
-				new BumpMapping.ConstructivePolarNormalFunction.Constant(r1  , r2  , 0, 5),
-				new BumpMapping.ConstructivePolarNormalFunction.Linear  (r2  , r2+2, vInner, vFace),
-				new BumpMapping.ConstructivePolarNormalFunction.Constant(r2+2, r3-2),
-				new BumpMapping.ConstructivePolarNormalFunction.Linear  (r3-2, r3  , vFace, vOuter),
-				new BumpMapping.ConstructivePolarNormalFunction.Constant(r3  , r4  , 5, 0),
-				new BumpMapping.ConstructivePolarNormalFunction.Constant(r4  , Double.POSITIVE_INFINITY)
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (0, r1),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r1  , r2  , 0, 5),
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend(r2  , r2+2, vInner, vFace),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r2+2, r3-2),
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend(r3-2, r3  , vFace, vOuter),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r3  , r4  , 5, 0),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r4  , Double.POSITIVE_INFINITY)
 			));
 		}),
 		RotaryCtrl_CNF2(new Consumer<BumpMapping>() {
@@ -370,22 +436,22 @@ public class BumpMappingTest {
 				double r2 = radius/2+5;
 				double r3 = radius-15;
 				double r4 = radius;
-				double tr = 1.1;
+				double tr = 2;
 				Normal vFace  = new Normal(0,0,1);
-				Normal vInner = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r1, r2, 0, 5);
-				Normal vOuter = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r3, r4, 5, 0);
+				Normal vInner = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r1+tr, r2   , 0, 5);
+				Normal vOuter = BumpMapping.ConstructivePolarNormalFunction.Constant.computeNormal(r3   , r4-tr, 5, 0);
 				bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
-					new BumpMapping.ConstructivePolarNormalFunction.Constant(   0.0, r1-tr ),
-					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r1-tr , r1    , vFace,new Normal(1,0,0)),
-					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r1    , r1+tr , new Normal(-1,0,0),vInner),
-					new BumpMapping.ConstructivePolarNormalFunction.Constant(r1+tr , r2    , 0, 5),
-					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r2    , r2+2  , vInner, vFace),
-					new BumpMapping.ConstructivePolarNormalFunction.Constant(r2+2  , r3-2  ),
-					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r3-2  , r3    , vFace, vOuter),
-					new BumpMapping.ConstructivePolarNormalFunction.Constant(r3    , r4-tr , 5, 0),
-					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r4-tr , r4    , vOuter,new Normal(1,0,0)),
-					new BumpMapping.ConstructivePolarNormalFunction.Linear  (r4    , r4+tr , new Normal(-1,0,0),vFace),
-					new BumpMapping.ConstructivePolarNormalFunction.Constant(r4+tr , Double.POSITIVE_INFINITY)
+					new BumpMapping.ConstructivePolarNormalFunction.Constant  (   0.0, r1-tr ),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r1-tr , r1    , vFace,new Normal(1,0,0)),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r1    , r1+tr , new Normal(-1,0,0),vInner),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant  (r1+tr , r2    , 0, 5),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r2    , r2+2  , vInner, vFace),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant  (r2+2  , r3-2  ),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r3-2  , r3    , vFace, vOuter),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant  (r3    , r4-tr , 5, 0),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r4-tr , r4    , vOuter,new Normal(1,0,0)),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r4    , r4+tr , new Normal(-1,0,0),vFace),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant  (r4+tr , Double.POSITIVE_INFINITY)
 				).setColorizer((w,r)->{
 					if (r<r1 || r>r4) return null;
 					return Color.GREEN;
@@ -432,15 +498,81 @@ public class BumpMappingTest {
 				return vFace;
 			});
 		}),
-		HemiSphere_CNF(bm -> {
-			double transition = 3;
+		HemiSphere_CNF_linear(bm -> {
 			double r1 = 100;
-			double r2 = r1+transition;
+			double r2 = r1+3;
 			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
-				new BumpMapping.ConstructivePolarNormalFunction.Linear  ( 0, r1, new Normal(0,0,1), new Normal(1,0,0)),
-				new BumpMapping.ConstructivePolarNormalFunction.Linear  (r1, r2, new Normal(1,0,0), new Normal(0,0,1)),
-				new BumpMapping.ConstructivePolarNormalFunction.Constant(r2, Double.POSITIVE_INFINITY)
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend( 0, r1, new Normal(0,0,1), new Normal(1,0,0)),
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend(r1, r2, new Normal(1,0,0), new Normal(0,0,1)),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r2, Double.POSITIVE_INFINITY)
 			));
+		}),
+		HemiSphere_CNF_round(bm -> {
+			double r1 = 100;
+			double r2 = r1+3;
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.RoundBlend( 0, r1, new Normal(0,0,1), new Normal(1,0,0)),
+				new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r1, r2, new Normal(1,0,0), new Normal(0,0,1)),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant  (r2, Double.POSITIVE_INFINITY)
+			));
+		}),
+		HemiSphere_CNF2_linear(bm -> {
+			double r1 = 60;
+			double r2 = 120;
+			Normal face = new Normal(0,0,1);
+			Normal mid  = new Normal(1,0,0);
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend( 0, r1, face, mid),
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend(r1, r2, mid, face),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r2, Double.POSITIVE_INFINITY)
+			));
+		}),
+		HemiSphere_CNF2_round(bm -> {
+			double r1 = 60;
+			double r2 = 120;
+			Normal face = new Normal(0,0,1);
+			Normal mid  = new Normal(1,0,0);
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.RoundBlend( 0, r1, face, mid),
+				new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r1, r2, mid, face),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant  (r2, Double.POSITIVE_INFINITY)
+			));
+		}),
+		HemiSphere_CNF3_linear(bm -> {
+			double r1 = 60;
+			double r2 = 120;
+			Normal face = new Normal(0,0,1);
+			Normal mid  = new Normal(1,0,2).normalize();
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend( 0, r1, face, mid),
+				new BumpMapping.ConstructivePolarNormalFunction.LinearBlend(r1, r2, mid, face),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant   (r2, Double.POSITIVE_INFINITY)
+			));
+		}),
+		HemiSphere_CNF3_round(bm -> {
+			double r1 = 60;
+			double r2 = 120;
+			Normal face = new Normal(0,0,1);
+			Normal mid  = new Normal(1,0,2).normalize();
+			bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+				new BumpMapping.ConstructivePolarNormalFunction.RoundBlend( 0, r1, face, mid),
+				new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(r1, r2, mid, face),
+				new BumpMapping.ConstructivePolarNormalFunction.Constant  (r2, Double.POSITIVE_INFINITY)
+			));
+		}),
+		HemiSphere_CNF4_round(new Consumer<BumpMapping>() {
+			@Override
+			public void accept(BumpMapping bm) {
+				Normal face = new Normal(0,0,1);
+				Normal mid1 = new Normal(-0.1,0,1).normalize();
+				Normal mid2 = new Normal(1,0,0.1).normalize();
+				bm.setNormalFunction(new BumpMapping.ConstructivePolarNormalFunction.Group(
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend(  0, 40, face, mid1),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend( 40, 80, mid1, mid2),
+					new BumpMapping.ConstructivePolarNormalFunction.RoundBlend( 80,120, mid2, face),
+					new BumpMapping.ConstructivePolarNormalFunction.Constant  (120, Double.POSITIVE_INFINITY)
+				));
+			}
 		}),
 		HemiSphereBubblesQ(bm -> {
 			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p)->{
@@ -526,8 +658,8 @@ public class BumpMappingTest {
 				}
 			
 			bm.setNormalFunction((x_, y_, width_, height_) -> {
-				int x2 = x_-(width_ /2-width/2);
-				int y2 = y_-(height_/2-width/2);
+				int x2 = (int) Math.round(x_-(width_ /2-width/2));
+				int y2 = (int) Math.round(y_-(height_/2-width/2));
 				if (x2<0 || x2>=width || y2<0 || y2>=width)
 					return new Normal(0,0,1);
 				
@@ -616,7 +748,7 @@ public class BumpMappingTest {
 			vFace = new Normal( 0,0,1);
 		}
 		
-		@Override public Normal getNormal(int x, int y, int width, int height) {
+		@Override public Normal getNormal(double x, double y, double width, double height) {
 			Normal n;
 			double xC = x-width/2.0;
 			double yC = y-height/2.0;
@@ -757,6 +889,10 @@ public class BumpMappingTest {
 
 		public ResultView(BumpMapping bumpMapping) {
 			this.bumpMapping = bumpMapping;
+		}
+
+		public BufferedImage renderScaledImage(float scale) {
+			return bumpMapping.renderScaledImage_uncached(width,height,scale);
 		}
 
 		@Override
