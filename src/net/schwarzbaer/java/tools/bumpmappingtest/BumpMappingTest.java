@@ -46,6 +46,8 @@ import net.schwarzbaer.image.BumpMapping;
 import net.schwarzbaer.image.BumpMapping.Normal;
 import net.schwarzbaer.image.BumpMapping.NormalFunctionPolar;
 import net.schwarzbaer.image.BumpMapping.NormalXY;
+import net.schwarzbaer.image.BumpMapping.ProfileXY;
+import net.schwarzbaer.image.BumpMapping.RotatedProfile;
 import net.schwarzbaer.image.BumpMapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MaterialShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MixedShading;
@@ -417,57 +419,54 @@ public class BumpMappingTest {
 			int r3 = radius-15;
 			int r4 = radius;
 			NormalXY vFace  = new NormalXY(0,1);
-			NormalXY vInner = BumpMapping.ProfileXY.Constant.computeNormal(r1, r2, 0, 5);
-			NormalXY vOuter = BumpMapping.ProfileXY.Constant.computeNormal(r3, r4, 5, 0);
+			NormalXY vInner = ProfileXY.Constant.computeNormal(r1, r2, 0, 5);
+			NormalXY vOuter = ProfileXY.Constant.computeNormal(r3, r4, 5, 0);
 			bm.setNormalFunction(
-				new BumpMapping.RotatedProfile(
-					new BumpMapping.ProfileXY.Group(
-						new BumpMapping.ProfileXY.Constant   (0, r1),
-						new BumpMapping.ProfileXY.Constant   (r1  , r2  , 0, 5),
-						new BumpMapping.ProfileXY.LinearBlend(r2  , r2+2, vInner, vFace),
-						new BumpMapping.ProfileXY.Constant   (r2+2, r3-2),
-						new BumpMapping.ProfileXY.LinearBlend(r3-2, r3  , vFace, vOuter),
-						new BumpMapping.ProfileXY.Constant   (r3  , r4  , 5, 0),
-						new BumpMapping.ProfileXY.Constant   (r4  , Double.POSITIVE_INFINITY)
+				new RotatedProfile(
+					new ProfileXY.Group(
+						new ProfileXY.Constant   (0, r1),
+						new ProfileXY.Constant   (r1  , r2  , 0, 5),
+						new ProfileXY.LinearBlend(r2  , r2+2, vInner, vFace),
+						new ProfileXY.Constant   (r2+2, r3-2),
+						new ProfileXY.LinearBlend(r3-2, r3  , vFace, vOuter),
+						new ProfileXY.Constant   (r3  , r4  , 5, 0),
+						new ProfileXY.Constant   (r4  , Double.POSITIVE_INFINITY)
 					)
 				)
 			);
 		}),
-		RotaryCtrl_CNF2(new Consumer<BumpMapping>() {
-			@Override
-			public void accept(BumpMapping bm) {
-				double radius = 100;
-				double r1 = radius/2;
-				double r2 = radius/2+5;
-				double r3 = radius-15;
-				double r4 = radius;
-				double tr = 2;
-				NormalXY vFace  = new NormalXY(0,1);
-				NormalXY vInner = BumpMapping.ProfileXY.Constant.computeNormal(r1+tr, r2   , 0, 5);
-				NormalXY vOuter = BumpMapping.ProfileXY.Constant.computeNormal(r3   , r4-tr, 5, 0);
-				NormalXY vHorizOutside = new NormalXY( 1,0);
-				NormalXY vHorizInside  = new NormalXY(-1,0);
-				bm.setNormalFunction(
-					new BumpMapping.RotatedProfile(
-						new BumpMapping.ProfileXY.Group(
-							new BumpMapping.ProfileXY.Constant  (   0.0, r1-tr ),
-							new BumpMapping.ProfileXY.RoundBlend(r1-tr , r1    , vFace,vHorizOutside),
-							new BumpMapping.ProfileXY.RoundBlend(r1    , r1+tr , vHorizInside,vInner),
-							new BumpMapping.ProfileXY.Constant  (r1+tr , r2    , 0, 5),
-							new BumpMapping.ProfileXY.RoundBlend(r2    , r2+2  , vInner, vFace),
-							new BumpMapping.ProfileXY.Constant  (r2+2  , r3-2  ),
-							new BumpMapping.ProfileXY.RoundBlend(r3-2  , r3    , vFace, vOuter),
-							new BumpMapping.ProfileXY.Constant  (r3    , r4-tr , 5, 0),
-							new BumpMapping.ProfileXY.RoundBlend(r4-tr , r4    , vOuter,vHorizOutside),
-							new BumpMapping.ProfileXY.RoundBlend(r4    , r4+tr , vHorizInside,vFace),
-							new BumpMapping.ProfileXY.Constant  (r4+tr , Double.POSITIVE_INFINITY)
-						)
-					).setColorizer((w,r)->{
-						if (r<r1 || r>r4) return null;
-						return Color.GREEN;
-					})
-				);
-			}
+		RotaryCtrl_CNF2(bm -> {
+			double radius = 100;
+			double r1 = radius/2;
+			double r2 = radius/2+5;
+			double r3 = radius-15;
+			double r4 = radius;
+			double tr = 2;
+			NormalXY vFace  = new NormalXY(0,1);
+			NormalXY vInner = ProfileXY.Constant.computeNormal(r1+tr, r2   , 0, 5);
+			NormalXY vOuter = ProfileXY.Constant.computeNormal(r3   , r4-tr, 5, 0);
+			NormalXY vHorizOutside = new NormalXY( 1,0);
+			NormalXY vHorizInside  = new NormalXY(-1,0);
+			bm.setNormalFunction(
+				new RotatedProfile(
+					new ProfileXY.Group(
+						new ProfileXY.Constant  (   0.0, r1-tr ),
+						new ProfileXY.RoundBlend(r1-tr , r1    , vFace,vHorizOutside),
+						new ProfileXY.RoundBlend(r1    , r1+tr , vHorizInside,vInner),
+						new ProfileXY.Constant  (r1+tr , r2    , 0, 5),
+						new ProfileXY.RoundBlend(r2    , r2+2  , vInner, vFace),
+						new ProfileXY.Constant  (r2+2  , r3-2  ),
+						new ProfileXY.RoundBlend(r3-2  , r3    , vFace, vOuter),
+						new ProfileXY.Constant  (r3    , r4-tr , 5, 0),
+						new ProfileXY.RoundBlend(r4-tr , r4    , vOuter,vHorizOutside),
+						new ProfileXY.RoundBlend(r4    , r4+tr , vHorizInside,vFace),
+						new ProfileXY.Constant  (r4+tr , Double.POSITIVE_INFINITY)
+					)
+				).setColorizer((w,r)->{
+					if (r<r1 || r>r4) return null;
+					return Color.GREEN;
+				})
+			);
 		}),
 		Spirale(bm->{
 			bm.setNormalFunction(new NormalFunctionPolar() {
@@ -512,19 +511,19 @@ public class BumpMappingTest {
 		HemiSphere_CNF_linear(bm -> {
 			double r1 = 100;
 			double r2 = r1+3;
-			bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-				new BumpMapping.ProfileXY.LinearBlend( 0, r1, new NormalXY(0,1), new NormalXY(1,0)),
-				new BumpMapping.ProfileXY.LinearBlend(r1, r2, new NormalXY(1,0), new NormalXY(0,1)),
-				new BumpMapping.ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.LinearBlend( 0, r1, new NormalXY(0,1), new NormalXY(1,0)),
+				new ProfileXY.LinearBlend(r1, r2, new NormalXY(1,0), new NormalXY(0,1)),
+				new ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
 			)));
 		}),
 		HemiSphere_CNF_round(bm -> {
 			double r1 = 100;
 			double r2 = r1+3;
-			bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-				new BumpMapping.ProfileXY.RoundBlend( 0, r1, new NormalXY(0,1), new NormalXY(1,0)),
-				new BumpMapping.ProfileXY.RoundBlend(r1, r2, new NormalXY(1,0), new NormalXY(0,1)),
-				new BumpMapping.ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.RoundBlend( 0, r1, new NormalXY(0,1), new NormalXY(1,0)),
+				new ProfileXY.RoundBlend(r1, r2, new NormalXY(1,0), new NormalXY(0,1)),
+				new ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
 			)));
 		}),
 		HemiSphere_CNF2_linear(bm -> {
@@ -532,10 +531,10 @@ public class BumpMappingTest {
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,0);
-			bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-				new BumpMapping.ProfileXY.LinearBlend( 0, r1, face, mid),
-				new BumpMapping.ProfileXY.LinearBlend(r1, r2, mid, face),
-				new BumpMapping.ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.LinearBlend( 0, r1, face, mid),
+				new ProfileXY.LinearBlend(r1, r2, mid, face),
+				new ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
 			)));
 		}),
 		HemiSphere_CNF2_round(bm -> {
@@ -543,10 +542,10 @@ public class BumpMappingTest {
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,0);
-			bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-				new BumpMapping.ProfileXY.RoundBlend( 0, r1, face, mid),
-				new BumpMapping.ProfileXY.RoundBlend(r1, r2, mid, face),
-				new BumpMapping.ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.RoundBlend( 0, r1, face, mid),
+				new ProfileXY.RoundBlend(r1, r2, mid, face),
+				new ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
 			)));
 		}),
 		HemiSphere_CNF3_linear(bm -> {
@@ -554,10 +553,10 @@ public class BumpMappingTest {
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,2).normalize();
-			bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-				new BumpMapping.ProfileXY.LinearBlend( 0, r1, face, mid),
-				new BumpMapping.ProfileXY.LinearBlend(r1, r2, mid, face),
-				new BumpMapping.ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.LinearBlend( 0, r1, face, mid),
+				new ProfileXY.LinearBlend(r1, r2, mid, face),
+				new ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
 			)));
 		}),
 		HemiSphere_CNF3_round(bm -> {
@@ -565,25 +564,22 @@ public class BumpMappingTest {
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,2).normalize();
-			bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-				new BumpMapping.ProfileXY.RoundBlend( 0, r1, face, mid),
-				new BumpMapping.ProfileXY.RoundBlend(r1, r2, mid, face),
-				new BumpMapping.ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.RoundBlend( 0, r1, face, mid),
+				new ProfileXY.RoundBlend(r1, r2, mid, face),
+				new ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
 			)));
 		}),
-		HemiSphere_CNF4_round(new Consumer<BumpMapping>() {
-			@Override
-			public void accept(BumpMapping bm) {
-				NormalXY face = new NormalXY( 0  ,1  );
-				NormalXY mid1 = new NormalXY(-0.1,1  ).normalize();
-				NormalXY mid2 = new NormalXY( 1  ,0.1).normalize();
-				bm.setNormalFunction( new BumpMapping.RotatedProfile( new BumpMapping.ProfileXY.Group(
-					new BumpMapping.ProfileXY.RoundBlend(  0, 40, face, mid1),
-					new BumpMapping.ProfileXY.RoundBlend( 40, 80, mid1, mid2),
-					new BumpMapping.ProfileXY.RoundBlend( 80,120, mid2, face),
-					new BumpMapping.ProfileXY.Constant  (120, Double.POSITIVE_INFINITY)
-				)));
-			}
+		HemiSphere_CNF4_round(bm -> {
+			NormalXY face = new NormalXY( 0  ,1  );
+			NormalXY mid1 = new NormalXY(-0.1,1  ).normalize();
+			NormalXY mid2 = new NormalXY( 1  ,0.1).normalize();
+			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+				new ProfileXY.RoundBlend(  0, 40, face, mid1),
+				new ProfileXY.RoundBlend( 40, 80, mid1, mid2),
+				new ProfileXY.RoundBlend( 80,120, mid2, face),
+				new ProfileXY.Constant  (120, Double.POSITIVE_INFINITY)
+			)));
 		}),
 		HemiSphereBubblesQ(bm -> {
 			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p)->{
