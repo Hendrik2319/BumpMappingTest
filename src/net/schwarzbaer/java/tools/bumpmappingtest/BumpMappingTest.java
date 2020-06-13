@@ -29,6 +29,7 @@ import java.util.function.Consumer;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
@@ -151,14 +152,18 @@ public class BumpMappingTest {
 				MaterialShading shading = (MaterialShading)sh.shading;
 				GBC.setFill(c, GBC.GridFill.HORIZONTAL);
 				GBC.setWeights(c,0,0);
-				sh.valuePanel.add(new JLabel("Material: "      ),GBC.setGridPos(c,0,0));
-				sh.valuePanel.add(new JLabel("MinIntensity: "  ),GBC.setGridPos(c,0,1));
-				sh.valuePanel.add(new JLabel("Phong Exponent: "),GBC.setGridPos(c,0,2));
+				sh.valuePanel.add(new JLabel("Material: "            ),GBC.setGridPos(c,0,0));
+				sh.valuePanel.add(new JLabel("Ambient Intensity: "   ),GBC.setGridPos(c,0,1));
+				sh.valuePanel.add(new JLabel("Phong Exponent: "      ),GBC.setGridPos(c,0,2));
+				sh.valuePanel.add(new JLabel("With Reflection: "     ),GBC.setGridPos(c,0,3));
+				sh.valuePanel.add(new JLabel("Reflection Intensity: "),GBC.setGridPos(c,0,4));
 				GBC.setWeights(c,1,0);
-				sh.valuePanel.add(createColorbutton(shading.getMaterialColor(), "Select Material Color", shading::setMaterialColor),GBC.setGridPos(c,1,0));
-				sh.valuePanel.add(createDoubleTextField(shading.getMinIntensity(), shading::setMinIntensity),GBC.setGridPos(c,1,1));
-				sh.valuePanel.add(createDoubleTextField(shading.getPhongExp()    , shading::setPhongExp    ),GBC.setGridPos(c,1,2));
-				GBC.setGridPos(c,0,3);
+				sh.valuePanel.add(createColorbutton    (shading.getMaterialColor()   , "Select Material Color", shading::setMaterialColor),GBC.setGridPos(c,1,0));
+				sh.valuePanel.add(createDoubleTextField(shading.getAmbientIntensity(), shading::setAmbientIntensity),GBC.setGridPos(c,1,1));
+				sh.valuePanel.add(createDoubleTextField(shading.getPhongExp()        , shading::setPhongExp        ),GBC.setGridPos(c,1,2));
+				sh.valuePanel.add(createCheckBox       (shading.getReflection()      , shading::setReflection      ),GBC.setGridPos(c,1,3));
+				sh.valuePanel.add(createDoubleTextField(shading.getReflIntensity()   , shading::setReflIntensity   ),GBC.setGridPos(c,1,4));
+				GBC.setGridPos(c,0,5);
 				GBC.setLineEnd(c);
 				GBC.setWeights(c,1,1);
 				sh.valuePanel.add(new JLabel(),c);
@@ -211,6 +216,17 @@ public class BumpMappingTest {
 		@Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[] { DataFlavor.imageFlavor }; }
 		@Override public boolean isDataFlavorSupported(DataFlavor flavor) { return DataFlavor.imageFlavor.equals(flavor); }
 		
+	}
+	
+	private JCheckBox createCheckBox(boolean isSelected, Consumer<Boolean> setValue) {
+		JCheckBox comp = new JCheckBox();
+		comp.setSelected(isSelected);
+		if (setValue!=null) comp.addActionListener(e->{
+			setValue.accept(comp.isSelected());
+			bumpMapping.resetImage();
+			resultView.repaint();
+		});
+		return comp;
 	}
 	
 	@SuppressWarnings("unused")
@@ -369,7 +385,7 @@ public class BumpMappingTest {
 	private enum Shading {
 		NormalImage(new NormalImage()),
 		GUISurface(new GUISurfaceShading(new Normal(1,-1,2).normalize(), Color.WHITE,new Color(0xf0f0f0),new Color(0x707070))),
-		Material(new MaterialShading(new Normal(1,-1,2).normalize(), Color.RED, 0, 40)),
+		Material(new MaterialShading(new Normal(1,-1,2).normalize(), Color.RED, 0, 40, false, 0)),
 		MixedShading(new MixedShading((double w,double r)->50<=r && r<100 ? 0 : 1,Shading.Material.shading,Shading.GUISurface.shading))
 		;
 		public JPanel valuePanel;
@@ -464,7 +480,7 @@ public class BumpMappingTest {
 					)
 				).setColorizer((w,r)->{
 					if (r<r1 || r>r4) return null;
-					return Color.GREEN;
+					return null; //Color.GREEN;
 				})
 			);
 		}),
