@@ -49,6 +49,7 @@ import net.schwarzbaer.image.BumpMapping.Indexer;
 import net.schwarzbaer.image.BumpMapping.Normal;
 import net.schwarzbaer.image.BumpMapping.NormalFunction;
 import net.schwarzbaer.image.BumpMapping.NormalXY;
+import net.schwarzbaer.image.BumpMapping.OverSampling;
 import net.schwarzbaer.image.BumpMapping.ProfileXY;
 import net.schwarzbaer.image.BumpMapping.RotatedProfile;
 import net.schwarzbaer.image.BumpMapping.Shading;
@@ -128,11 +129,14 @@ public class BumpMappingTest {
 		GBC.setFill(c, GBC.GridFill.BOTH);
 		JPanel selectionPanel = new JPanel(new GridBagLayout());
 		GBC.setWeights(c,0,1);
-		selectionPanel.add(new JLabel("NormalFunction: "),GBC.setGridPos(c,0,0));
-		selectionPanel.add(new JLabel("Shading: "       ),GBC.setGridPos(c,0,1));
+		
+		selectionPanel.add(new JLabel("OverSampling: "  ),GBC.setGridPos(c,0,0));
+		selectionPanel.add(new JLabel("NormalFunction: "),GBC.setGridPos(c,0,1));
+		selectionPanel.add(new JLabel("Shading: "       ),GBC.setGridPos(c,0,2));
 		GBC.setWeights(c,1,1);
-		selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction, this::setNormalFunction),GBC.setGridPos(c,1,0));
-		selectionPanel.add(createComboBox(Shadings.values(), initialShading, this::setShading),GBC.setGridPos(c,1,1));
+		selectionPanel.add(createComboBox(OverSampling   .values(), bumpMapping.getOverSampling(), this::setOverSampling  ),GBC.setGridPos(c,1,0));
+		selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         this::setNormalFunction),GBC.setGridPos(c,1,1));
+		selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                this::setShading       ),GBC.setGridPos(c,1,2));
 		
 		optionsPanel = new JPanel(new BorderLayout(3,3));
 		optionsPanel.setBorder(BorderFactory.createTitledBorder("Options"));
@@ -383,6 +387,11 @@ public class BumpMappingTest {
 
 	private void setNormalFunction(NormalFunctions nf) {
 		nf.setNormalFunction.accept(bumpMapping);
+		resultView.repaint();
+	}
+
+	private void setOverSampling(OverSampling os) {
+		bumpMapping.setOverSampling(os);
 		resultView.repaint();
 	}
 
