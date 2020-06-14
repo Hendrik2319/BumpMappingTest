@@ -426,8 +426,8 @@ public class BumpMappingTest {
 				new ProfileXY.Constant  (r4+tr , Double.POSITIVE_INFINITY)
 			)
 		).setColorizer((w,r)->{
-			if (r<r1 || r>r4) return null;
-			return null; //Color.GREEN;
+			if (r<r1 || r>r4) return Color.GREEN;
+			return null;
 		});
 	}
 	
@@ -518,15 +518,16 @@ public class BumpMappingTest {
 					);
 				ExtraNormalFunctionPolar.LineOnX bigLine   = new ExtraNormalFunctionPolar.LineOnX(minR+profileBigLine  .maxR, maxR-profileBigLine  .maxR, profileBigLine   );
 				ExtraNormalFunctionPolar.LineOnX smallLine = new ExtraNormalFunctionPolar.LineOnX(minR+profileSmallLine.maxR, maxR-profileSmallLine.maxR, profileSmallLine );
+				double angle = 75.0;
 				bm.setNormalFunction(
 					createRotaryCtrlProfile(radius,5,15,tr,5).setExtras(
 						new ExtraNormalFunctionPolar.Group(
-							new ExtraNormalFunctionPolar.Rotated( 10, bigLine),
-							new ExtraNormalFunctionPolar.Rotated( 70, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(130, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(190, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(250, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(310, smallLine)
+							new ExtraNormalFunctionPolar.Rotated(angle    , bigLine),
+							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine)
 						)
 					)
 				);
