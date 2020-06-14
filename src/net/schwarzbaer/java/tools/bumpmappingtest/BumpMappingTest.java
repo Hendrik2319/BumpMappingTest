@@ -63,6 +63,17 @@ public class BumpMappingTest {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		new BumpMappingTest().createGUI();
+		
+		//testRotZ(2,1,0,90);
+		//testRotZ(2,0,1,90);
+		
+	}
+
+	@SuppressWarnings("unused")
+	private static void testRotZ(double x, double y, double z, double w_degree) {
+		Normal n = new Normal(x,y,z);
+		System.out.printf(Locale.ENGLISH, "%s.rotateZ(%1.1f°) -> %s%n", n, w_degree, n.rotateZ(w_degree/180*Math.PI));
+		System.out.printf(Locale.ENGLISH, "%s.rotateY(%1.1f°) -> %s%n", n, w_degree, n.rotateY(w_degree/180*Math.PI));
 	}
 
 	private Normal sun;
@@ -389,7 +400,7 @@ public class BumpMappingTest {
 		NormalImage(new NormalImage()),
 		GUISurface  (new GUISurfaceShading(new Normal(1,-1,2).normalize(), Color.WHITE,new Color(0xf0f0f0),new Color(0x707070))),
 		Material    (new MaterialShading  (new Normal(1,-1,2).normalize(), Color.RED, 0, 40, false, 0)),
-		MixedShading(new MixedShading     ((Indexer.Polar)(w,r)->50<=r && r<100 ? 0 : 1,Shadings.Material.shading,Shadings.GUISurface.shading)),
+		MixedShading(new MixedShading     ((Indexer.Polar)(w,r)->27.5<=r && r<55 ? 0 : 1,Shadings.Material.shading,Shadings.GUISurface.shading)),
 		;
 		public JPanel valuePanel;
 		private final Shading shading;
@@ -494,10 +505,8 @@ public class BumpMappingTest {
 		RotaryCtrl_CNF2_Extras(new Consumer<BumpMapping>() {
 			@Override
 			public void accept(BumpMapping bm) {
-				double radius = 100;
+				double radius = 55;
 				double tr = 2;
-				double minR = radius/2+5+tr*2;
-				double maxR = radius-tr*2;
 				double ramp = 1;
 				double lineHeight = 2;
 				
@@ -516,18 +525,44 @@ public class BumpMappingTest {
 						new ProfileXY.Constant   (0.5       , 0.5+ramp/2, 0,lineHeight/2),
 						new ProfileXY.RoundBlend (0.5+ramp/2, 0.8+ramp/2, vRamp, vFace)
 					);
-				ExtraNormalFunctionPolar.LineOnX bigLine   = new ExtraNormalFunctionPolar.LineOnX(minR+profileBigLine  .maxR, maxR-profileBigLine  .maxR, profileBigLine   );
-				ExtraNormalFunctionPolar.LineOnX smallLine = new ExtraNormalFunctionPolar.LineOnX(minR+profileSmallLine.maxR, maxR-profileSmallLine.maxR, profileSmallLine );
-				double angle = 75.0;
+				
+				double minRB = radius/2+5+tr*2+profileBigLine  .maxR;
+				double maxRB = radius-tr*2+10 -profileBigLine  .maxR; maxRB = radius;
+				double minRS = radius/2+5+tr*2+profileSmallLine.maxR; minRS = radius-17;
+				double maxRS = radius-tr*2+10 -profileSmallLine.maxR; maxRS = radius+5;
+				ExtraNormalFunctionPolar.LineOnX bigLine   = new ExtraNormalFunctionPolar.LineOnX(minRB, maxRB, profileBigLine   );
+				ExtraNormalFunctionPolar.LineOnX smallLine = new ExtraNormalFunctionPolar.LineOnX(minRS, maxRS, profileSmallLine );
+				double angleIn  = 75.0;
+				double angleOut = 0;
 				bm.setNormalFunction(
 					createRotaryCtrlProfile(radius,5,15,tr,5).setExtras(
 						new ExtraNormalFunctionPolar.Group(
-							new ExtraNormalFunctionPolar.Rotated(angle    , bigLine),
-							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine),
-							new ExtraNormalFunctionPolar.Rotated(angle+=60, smallLine)
+							new ExtraNormalFunctionPolar.Stencil(
+								(w,r)->r<=radius,
+								new ExtraNormalFunctionPolar.Group(
+									new ExtraNormalFunctionPolar.Rotated(angleIn    , bigLine)
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
+//									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine)
+								)
+							),
+							new ExtraNormalFunctionPolar.Stencil(
+									(w,r)->r>radius,
+									new ExtraNormalFunctionPolar.Group(
+										new ExtraNormalFunctionPolar.Rotated(angleOut    , smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine)
+									)
+								)
 						)
 					)
 				);
