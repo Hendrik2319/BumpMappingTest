@@ -44,11 +44,14 @@ import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.gui.HSColorChooser;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.image.BumpMapping;
+import net.schwarzbaer.image.BumpMapping.ExtraNormalFunctionPolar;
+import net.schwarzbaer.image.BumpMapping.Indexer;
 import net.schwarzbaer.image.BumpMapping.Normal;
-import net.schwarzbaer.image.BumpMapping.NormalFunctionPolar;
+import net.schwarzbaer.image.BumpMapping.NormalFunction;
 import net.schwarzbaer.image.BumpMapping.NormalXY;
 import net.schwarzbaer.image.BumpMapping.ProfileXY;
 import net.schwarzbaer.image.BumpMapping.RotatedProfile;
+import net.schwarzbaer.image.BumpMapping.Shading;
 import net.schwarzbaer.image.BumpMapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MaterialShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MixedShading;
@@ -74,8 +77,8 @@ public class BumpMappingTest {
 		mainwindow = new StandardMainWindow("BumpMappingTest");
 		
 		sun = new Normal(1,-1,2).normalize();
-		NormalFunction initialNormalFunction = NormalFunction.HemiSphereBubblesT;
-		Shading initialShading = Shading.Material;
+		NormalFunctions initialNormalFunction = NormalFunctions.HemiSphereBubblesT;
+		Shadings initialShading = Shadings.Material;
 		
 		bumpMapping = new BumpMapping(true);
 		
@@ -117,14 +120,14 @@ public class BumpMappingTest {
 		selectionPanel.add(new JLabel("NormalFunction: "),GBC.setGridPos(c,0,0));
 		selectionPanel.add(new JLabel("Shading: "       ),GBC.setGridPos(c,0,1));
 		GBC.setWeights(c,1,1);
-		selectionPanel.add(createComboBox(NormalFunction.values(), initialNormalFunction, this::setNormalFunction),GBC.setGridPos(c,1,0));
-		selectionPanel.add(createComboBox(Shading.values(), initialShading, this::setShading),GBC.setGridPos(c,1,1));
+		selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction, this::setNormalFunction),GBC.setGridPos(c,1,0));
+		selectionPanel.add(createComboBox(Shadings.values(), initialShading, this::setShading),GBC.setGridPos(c,1,1));
 		
 		optionsPanel = new JPanel(new BorderLayout(3,3));
 		optionsPanel.setBorder(BorderFactory.createTitledBorder("Options"));
 		optionsPanel.add(selectionPanel,BorderLayout.NORTH);
 		
-		for (Shading sh:Shading.values()) {
+		for (Shadings sh:Shadings.values()) {
 			sh.valuePanel = new JPanel(new GridBagLayout());
 			sh.valuePanel.setBorder(BorderFactory.createTitledBorder("Shading Values"));
 			GBC.reset(c);
@@ -356,7 +359,7 @@ public class BumpMappingTest {
 		}
 	}
 	
-	private void setShading(Shading sh) {
+	private void setShading(Shadings sh) {
 		if (currentValuePanel!=null) optionsPanel.remove(currentValuePanel);
 		currentValuePanel = sh.valuePanel;
 		optionsPanel.add(sh.valuePanel, BorderLayout.CENTER);
@@ -367,7 +370,7 @@ public class BumpMappingTest {
 		resultView.repaint();
 	}
 
-	private void setNormalFunction(NormalFunction nf) {
+	private void setNormalFunction(NormalFunctions nf) {
 		nf.setNormalFunction.accept(bumpMapping);
 		resultView.repaint();
 	}
@@ -382,23 +385,55 @@ public class BumpMappingTest {
 		return comp;
 	}
 	
-	private enum Shading {
+	private enum Shadings {
 		NormalImage(new NormalImage()),
-		GUISurface(new GUISurfaceShading(new Normal(1,-1,2).normalize(), Color.WHITE,new Color(0xf0f0f0),new Color(0x707070))),
-		Material(new MaterialShading(new Normal(1,-1,2).normalize(), Color.RED, 0, 40, false, 0)),
-		MixedShading(new MixedShading((double w,double r)->50<=r && r<100 ? 0 : 1,Shading.Material.shading,Shading.GUISurface.shading))
+		GUISurface  (new GUISurfaceShading(new Normal(1,-1,2).normalize(), Color.WHITE,new Color(0xf0f0f0),new Color(0x707070))),
+		Material    (new MaterialShading  (new Normal(1,-1,2).normalize(), Color.RED, 0, 40, false, 0)),
+		MixedShading(new MixedShading     ((Indexer.Polar)(w,r)->50<=r && r<100 ? 0 : 1,Shadings.Material.shading,Shadings.GUISurface.shading)),
 		;
 		public JPanel valuePanel;
-		private final BumpMapping.Shading shading;
-		Shading(BumpMapping.Shading shading) {
+		private final Shading shading;
+		Shadings(Shading shading) {
 			this.shading = shading;
 			valuePanel = null;
 		}
 	}
 	
-	private enum NormalFunction {
+	private static RotatedProfile createRotaryCtrlProfile(double radius, double innerRing, double outerRing, double transition, double height) {
+		double r1 = radius/2;
+		double r2 = radius/2+innerRing;
+		double r3 = radius-outerRing;
+		double r4 = radius;
+		double tr = transition;
+		NormalXY vFace  = new NormalXY(0,1);
+		NormalXY vInner = ProfileXY.Constant.computeNormal(r1+tr, r2   , 0, height);
+		NormalXY vOuter = ProfileXY.Constant.computeNormal(r3   , r4-tr, height, 0);
+		NormalXY vHorizOutside = new NormalXY( 1,0);
+		NormalXY vHorizInside  = new NormalXY(-1,0);
+		
+		return new RotatedProfile(
+			new ProfileXY.Group(
+				new ProfileXY.Constant  (   0.0, r1-tr ),
+				new ProfileXY.RoundBlend(r1-tr , r1    , vFace,vHorizOutside),
+				new ProfileXY.RoundBlend(r1    , r1+tr , vHorizInside,vInner),
+				new ProfileXY.Constant  (r1+tr , r2    , 0, height),
+				new ProfileXY.RoundBlend(r2    , r2+tr , vInner, vFace),
+				new ProfileXY.Constant  (r2+tr , r3-tr ),
+				new ProfileXY.RoundBlend(r3-tr , r3    , vFace, vOuter),
+				new ProfileXY.Constant  (r3    , r4-tr , height, 0),
+				new ProfileXY.RoundBlend(r4-tr , r4    , vOuter,vHorizOutside),
+				new ProfileXY.RoundBlend(r4    , r4+tr , vHorizInside,vFace),
+				new ProfileXY.Constant  (r4+tr , Double.POSITIVE_INFINITY)
+			)
+		).setColorizer((w,r)->{
+			if (r<r1 || r>r4) return null;
+			return null; //Color.GREEN;
+		});
+	}
+	
+	private enum NormalFunctions {
 		Simple(bm->{
-			bm.setNormalFunction((double w,double r)->{
+			bm.setNormalFunction((NormalFunction.Polar) (w, r) ->{
 					Normal n;
 					if      (30<r && r<40) n = new Normal(-1,0,1).normalize().rotateZ(w);
 					else if (60<r && r<70) n = new Normal(1,0,1).normalize().rotateZ(w);
@@ -411,7 +446,7 @@ public class BumpMappingTest {
 			Normal vFace  = new Normal( 0,0,1);
 			Normal vInner = new Normal(-1,0,1);
 			Normal vOuter = new Normal( 1,0,3);
-			bm.setNormalFunction( (double w,double r) -> {
+			bm.setNormalFunction((NormalFunction.Polar) (w, r) -> {
 					Normal n;
 					int r1 = radius/2;
 					int r2 = radius/2+5;
@@ -452,58 +487,66 @@ public class BumpMappingTest {
 			);
 		}),
 		RotaryCtrl_CNF2(bm -> {
-			double radius = 100;
-			double r1 = radius/2;
-			double r2 = radius/2+5;
-			double r3 = radius-15;
-			double r4 = radius;
-			double tr = 2;
-			NormalXY vFace  = new NormalXY(0,1);
-			NormalXY vInner = ProfileXY.Constant.computeNormal(r1+tr, r2   , 0, 5);
-			NormalXY vOuter = ProfileXY.Constant.computeNormal(r3   , r4-tr, 5, 0);
-			NormalXY vHorizOutside = new NormalXY( 1,0);
-			NormalXY vHorizInside  = new NormalXY(-1,0);
 			bm.setNormalFunction(
-				new RotatedProfile(
-					new ProfileXY.Group(
-						new ProfileXY.Constant  (   0.0, r1-tr ),
-						new ProfileXY.RoundBlend(r1-tr , r1    , vFace,vHorizOutside),
-						new ProfileXY.RoundBlend(r1    , r1+tr , vHorizInside,vInner),
-						new ProfileXY.Constant  (r1+tr , r2    , 0, 5),
-						new ProfileXY.RoundBlend(r2    , r2+2  , vInner, vFace),
-						new ProfileXY.Constant  (r2+2  , r3-2  ),
-						new ProfileXY.RoundBlend(r3-2  , r3    , vFace, vOuter),
-						new ProfileXY.Constant  (r3    , r4-tr , 5, 0),
-						new ProfileXY.RoundBlend(r4-tr , r4    , vOuter,vHorizOutside),
-						new ProfileXY.RoundBlend(r4    , r4+tr , vHorizInside,vFace),
-						new ProfileXY.Constant  (r4+tr , Double.POSITIVE_INFINITY)
-					)
-				).setColorizer((w,r)->{
-					if (r<r1 || r>r4) return null;
-					return null; //Color.GREEN;
-				})
+				createRotaryCtrlProfile(100,5,15,2,5)
 			);
 		}),
-		Spirale(bm->{
-			bm.setNormalFunction(new NormalFunctionPolar() {
-				@Override
-				public Normal getNormal(double w, double r) {
-					double pAmpl = 60;
-					double rAmpl = r + w*pAmpl/Math.PI;
-					double pSpir = 5;
-					double rSpir = r + w*pSpir/Math.PI;
-					double ampl = Math.sin(rAmpl/pAmpl*Math.PI); ampl *= ampl;
-					double spir = Math.sin(rSpir/pSpir*Math.PI) * ampl*ampl;
-					double f = 0.9; // 0.7; // 1; // 1/Math.sqrt(2); 
-					return new Normal(f*spir,0,Math.sqrt(1-f*f*spir*spir)).normalize().rotateZ(w);
-				}
-			});
+		RotaryCtrl_CNF2_Extras(new Consumer<BumpMapping>() {
+			@Override
+			public void accept(BumpMapping bm) {
+				double radius = 100;
+				double tr = 2;
+				double minR = radius/2+5+tr*2;
+				double maxR = radius-tr*2;
+				double ramp = 1;
+				double lineHeight = 2;
+				
+				NormalXY vFace = new NormalXY(0,1);
+				NormalXY vRamp = ProfileXY.Constant.computeNormal(0,ramp, 0,lineHeight);
+				
+				ProfileXY.Group profileBigLine = new ProfileXY.Group(
+					new ProfileXY.Constant   (0.0     , 0.5     ),
+					new ProfileXY.RoundBlend (0.5     , 1.5     , vFace, vRamp),
+					new ProfileXY.Constant   (1.5     , 1.5+ramp, 0,lineHeight),
+					new ProfileXY.RoundBlend (1.5+ramp, 2.5+ramp, vRamp, vFace)
+				);
+				ProfileXY.Group profileSmallLine = new ProfileXY.Group(
+						new ProfileXY.Constant   (0.0       , 0.2       ),
+						new ProfileXY.RoundBlend (0.2       , 0.5       , vFace, vRamp),
+						new ProfileXY.Constant   (0.5       , 0.5+ramp/2, 0,lineHeight/2),
+						new ProfileXY.RoundBlend (0.5+ramp/2, 0.8+ramp/2, vRamp, vFace)
+					);
+				ExtraNormalFunctionPolar.LineOnX bigLine   = new ExtraNormalFunctionPolar.LineOnX(minR+profileBigLine  .maxR, maxR-profileBigLine  .maxR, profileBigLine   );
+				ExtraNormalFunctionPolar.LineOnX smallLine = new ExtraNormalFunctionPolar.LineOnX(minR+profileSmallLine.maxR, maxR-profileSmallLine.maxR, profileSmallLine );
+				bm.setNormalFunction(
+					createRotaryCtrlProfile(radius,5,15,tr,5).setExtras(
+						new ExtraNormalFunctionPolar.Group(
+							new ExtraNormalFunctionPolar.Rotated( 10, bigLine),
+							new ExtraNormalFunctionPolar.Rotated( 70, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(130, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(190, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(250, smallLine),
+							new ExtraNormalFunctionPolar.Rotated(310, smallLine)
+						)
+					)
+				);
+			}
 		}),
+		Spirale(bm -> bm.setNormalFunction((NormalFunction.Polar) (w, r) -> {
+			double pAmpl = 60;
+			double rAmpl = r + w*pAmpl/Math.PI;
+			double pSpir = 5;
+			double rSpir = r + w*pSpir/Math.PI;
+			double ampl = Math.sin(rAmpl/pAmpl*Math.PI); ampl *= ampl;
+			double spir = Math.sin(rSpir/pSpir*Math.PI) * ampl*ampl;
+			double f = 0.9; // 0.7; // 1; // 1/Math.sqrt(2); 
+			return new Normal(f*spir,0,Math.sqrt(1-f*f*spir*spir)).normalize().rotateZ(w);
+		})),
 		HemiSphere(bm->{
 			Normal vFace  = new Normal( 0,0,1);
 			double radius = 100;
 			double transition = 3;
-			bm.setNormalFunction((double w,double r)->{
+			bm.setNormalFunction((NormalFunction.Polar) (w, r) ->{
 				Normal n;
 				if (r < radius)
 					n = new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
@@ -519,7 +562,7 @@ public class BumpMappingTest {
 		HemiSphere2(bm->{
 			Normal vFace  = new Normal( 0,0,1);
 			bm.setNormalFunction((x,y,width,height)->{
-				Normal n = NormalFunction.getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
+				Normal n = NormalFunctions.getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
 				if (n!=null) return n;
 				return vFace;
 			});
@@ -725,7 +768,7 @@ public class BumpMappingTest {
 		}),
 		;
 		Consumer<BumpMapping> setNormalFunction;
-		NormalFunction(Consumer<BumpMapping> setNormalFunction) {
+		NormalFunctions(Consumer<BumpMapping> setNormalFunction) {
 			this.setNormalFunction = setNormalFunction;
 		}
 		
@@ -744,7 +787,7 @@ public class BumpMappingTest {
 		}
 	}
 	
-	private static class BubbleRaster implements BumpMapping.NormalFunction {
+	private static class BubbleRaster implements NormalFunction {
 		
 		private Normal vFace;
 		
@@ -776,7 +819,7 @@ public class BumpMappingTest {
 			double xC = x-width/2.0;
 			double yC = y-height/2.0;
 			
-			n = NormalFunction.getBubbleNormal(xC,yC, radius, transition, vFace, false);
+			n = NormalFunctions.getBubbleNormal(xC,yC, radius, transition, vFace, false);
 			if (n!=null) return n;
 			
 			//double xM = Math.round(xC/raster)*raster;
@@ -790,7 +833,7 @@ public class BumpMappingTest {
 			if (Math.sqrt(xM*xM+yM*yM) < radius+transition+radiusB+transitionB)
 				return vFace;
 			
-			n = NormalFunction.getBubbleNormal(xC-xM,yC-yM, radiusB, transitionB, vFace, false);
+			n = NormalFunctions.getBubbleNormal(xC-xM,yC-yM, radiusB, transitionB, vFace, false);
 			if (n!=null) return n;
 			
 			return vFace;
