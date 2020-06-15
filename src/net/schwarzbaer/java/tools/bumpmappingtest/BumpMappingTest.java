@@ -453,35 +453,34 @@ public class BumpMappingTest {
 	
 	private enum NormalFunctions {
 		Simple(bm->{
-			bm.setNormalFunction((NormalFunction.Polar) (w, r) ->{
+			bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) ->{
 					Normal n;
 					if      (30<r && r<40) n = new Normal(-1,0,1).normalize().rotateZ(w);
 					else if (60<r && r<70) n = new Normal(1,0,1).normalize().rotateZ(w);
 					else                   n = new Normal(0,0,1);
 					return n;
-			});
+			}));
 		}),
 		RotaryCtrl(bm->{
 			int radius = 100;
 			Normal vFace  = new Normal( 0,0,1);
 			Normal vInner = new Normal(-1,0,1);
 			Normal vOuter = new Normal( 1,0,3);
-			bm.setNormalFunction((NormalFunction.Polar) (w, r) -> {
-					Normal n;
-					int r1 = radius/2;
-					int r2 = radius/2+5;
-					int r3 = radius-15;
-					int r4 = radius;
-					if      (r1  <r && r<=r2  ) n = vInner;
-					else if (r2  <r && r<=r2+2) n = Normal.blend(r, r2  , r2+2, vInner, vFace);
-					//else if (r1-2<r && r<=r1  ) n = Vector3D.blend(r, r1-2, r1  , vFace, vInner);
-					else if (r3-2<r && r<=r3  ) n = Normal.blend(r, r3-2, r3  , vFace, vOuter);
-					else if (r3  <r && r<=r4  ) n = vOuter;
-					//else if (r4  <r && r<=r4+2) n = Vector3D.blend(r, r4  , r4+2, vOuter, vFace);
-					else                        n = vFace;
-					return n.normalize().rotateZ(w);
-				}
-			);
+			bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) -> {
+				Normal n;
+				int r1 = radius/2;
+				int r2 = radius/2+5;
+				int r3 = radius-15;
+				int r4 = radius;
+				if      (r1  <r && r<=r2  ) n = vInner;
+				else if (r2  <r && r<=r2+2) n = Normal.blend(r, r2  , r2+2, vInner, vFace);
+				//else if (r1-2<r && r<=r1  ) n = Vector3D.blend(r, r1-2, r1  , vFace, vInner);
+				else if (r3-2<r && r<=r3  ) n = Normal.blend(r, r3-2, r3  , vFace, vOuter);
+				else if (r3  <r && r<=r4  ) n = vOuter;
+				//else if (r4  <r && r<=r4+2) n = Vector3D.blend(r, r4  , r4+2, vOuter, vFace);
+				else                        n = vFace;
+				return n.normalize().rotateZ(w);
+			}));
 		}),
 		RotaryCtrl_CNF(bm -> {
 			int radius = 100;
@@ -577,7 +576,7 @@ public class BumpMappingTest {
 				);
 			}
 		}),
-		Spirale(bm -> bm.setNormalFunction((NormalFunction.Polar) (w, r) -> {
+		Spirale(bm -> bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) -> {
 			double pAmpl = 60;
 			double rAmpl = r + w*pAmpl/Math.PI;
 			double pSpir = 5;
@@ -586,12 +585,12 @@ public class BumpMappingTest {
 			double spir = Math.sin(rSpir/pSpir*Math.PI) * ampl*ampl;
 			double f = 0.9; // 0.7; // 1; // 1/Math.sqrt(2); 
 			return new Normal(f*spir,0,Math.sqrt(1-f*f*spir*spir)).normalize().rotateZ(w);
-		})),
+		}))),
 		HemiSphere(bm->{
 			Normal vFace  = new Normal( 0,0,1);
 			double radius = 100;
 			double transition = 3;
-			bm.setNormalFunction((NormalFunction.Polar) (w, r) ->{
+			bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) ->{
 				Normal n;
 				if (r < radius)
 					n = new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
@@ -602,15 +601,15 @@ public class BumpMappingTest {
 						n = vFace;
 				}
 				return n;
-			});
+			}));
 		}),
 		HemiSphere2(bm->{
 			Normal vFace  = new Normal( 0,0,1);
-			bm.setNormalFunction((x,y,width,height)->{
+			bm.setNormalFunction(new NormalFunction.Simple((x,y,width,height)->{
 				Normal n = NormalFunctions.getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
-				if (n!=null) return n;
-				return vFace;
-			});
+				if (n == null) return vFace;
+				return n;
+			}));
 		}),
 		HemiSphere_CNF_linear(bm -> {
 			double r1 = 100;
@@ -768,7 +767,7 @@ public class BumpMappingTest {
 					else colors[x1][y1] = null;
 				}
 			
-			bm.setNormalFunction((x_, y_, width_, height_) -> {
+			bm.setNormalFunction(new NormalFunction.Simple((x_, y_, width_, height_) -> {
 				int x2 = (int) Math.round(x_-(width_ /2-width/2));
 				int y2 = (int) Math.round(y_-(height_/2-width/2));
 				if (x2<0 || x2>=width || y2<0 || y2>=width)
@@ -808,7 +807,7 @@ public class BumpMappingTest {
 					}
 					
 				}
-			});
+			}));
 
 		}),
 		;
@@ -858,7 +857,9 @@ public class BumpMappingTest {
 			rasterPoint = new Point2D.Double();
 			vFace = new Normal( 0,0,1);
 		}
-		
+		@Override
+		public void forceNormalCreation(boolean force) {}
+
 		@Override public Normal getNormal(double x, double y, double width, double height) {
 			Normal n;
 			double xC = x-width/2.0;
@@ -879,9 +880,10 @@ public class BumpMappingTest {
 				return vFace;
 			
 			n = NormalFunctions.getBubbleNormal(xC-xM,yC-yM, radiusB, transitionB, vFace, false);
-			if (n!=null) return n;
+			if (n == null)
+				return vFace;
 			
-			return vFace;
+			return n;
 		}
 	}
 	
