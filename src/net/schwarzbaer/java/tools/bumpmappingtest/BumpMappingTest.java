@@ -10,6 +10,7 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Toolkit;
+import java.awt.Window;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.datatransfer.Transferable;
@@ -42,6 +43,7 @@ import javax.swing.UnsupportedLookAndFeelException;
 import net.schwarzbaer.gui.BumpmappingSunControl;
 import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.gui.HSColorChooser;
+import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.image.BumpMapping;
 import net.schwarzbaer.image.BumpMapping.ExtraNormalFunctionPolar;
@@ -92,17 +94,17 @@ public class BumpMappingTest {
 		NormalFunctions initialNormalFunction = NormalFunctions.HemiSphereBubblesT;
 		Shadings initialShading = Shadings.Material;
 		
-		bumpMapping = new BumpMapping(true);
+		bumpMapping = new BumpMapping(true,true);
 		
 		resultView = new ResultView(bumpMapping);
 		resultView.setBorder(BorderFactory.createTitledBorder("Result"));
 		resultView.setPreferredSize(new Dimension(300,300));
 		
 		JPanel buttonPanel = new JPanel(new GridLayout(1,0,3,3));
-		buttonPanel.add(createButton("Copy"   ,(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(1));}));
-		buttonPanel.add(createButton("Copy 2x",(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(2));}));
-		buttonPanel.add(createButton("Copy 4x",(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(4));}));
-		buttonPanel.add(createButton("Copy 8x",(JButton b)->{copyImageToClipboard(b,resultView.renderScaledImage(8));}));
+		buttonPanel.add(createButton("Copy"   ,(JButton b)->copyImageToClipboard(b,1)));
+		buttonPanel.add(createButton("Copy 2x",(JButton b)->copyImageToClipboard(b,2)));
+		buttonPanel.add(createButton("Copy 4x",(JButton b)->copyImageToClipboard(b,4)));
+		buttonPanel.add(createButton("Copy 8x",(JButton b)->copyImageToClipboard(b,8)));
 		
 		JPanel resultViewPanel = new JPanel(new BorderLayout(3,3));
 		resultViewPanel.add(resultView,BorderLayout.CENTER);
@@ -204,20 +206,44 @@ public class BumpMappingTest {
 		
 		mainwindow.startGUI(contentPane);
 	}
+	
+	private static void processInEventThread(Runnable task) {
+		SwingUtilities.invokeLater(task);
+	}
 
-	private void copyImageToClipboard(JComponent comp, BufferedImage image) {
+	private static void processInEventThreadAndWait(Runnable task) {
+		try { SwingUtilities.invokeAndWait(task); }
+		catch (InvocationTargetException | InterruptedException e) {}
+	}
+
+	private static void runWithProgressDialog(Window parent, String title, Consumer<ProgressDialog> useProgressDialog) {
+		ProgressDialog.runWithProgressDialog(parent, title, 400, useProgressDialog);
+	}
+
+	private void copyImageToClipboard(JComponent comp, float scale) {
 		new Thread(()->{
-			try { SwingUtilities.invokeAndWait(()->comp.setEnabled(false)); }
-			catch (InvocationTargetException | InterruptedException e) {}
+			processInEventThreadAndWait(()->comp.setEnabled(false));
 			
-			Toolkit toolkit = Toolkit.getDefaultToolkit();
-			Clipboard clipboard = toolkit.getSystemClipboard();
-			TransferableImage content = new TransferableImage(image);
-			//DataHandler content = new DataHandler(image,"image/x-java-image");
-			try { clipboard.setContents(content,null); }
-			catch (IllegalStateException e1) { e1.printStackTrace(); }
+			runWithProgressDialog(mainwindow, "Copy Scaled Image to Clipboard", pd->{
+				BufferedImage image = resultView.renderScaledImage(scale,pd);
+				
+				processInEventThreadAndWait(()->{
+					pd.setTaskTitle("Copy to Clipboard");
+					pd.setIndeterminate(true);
+				});
+				
+				Toolkit toolkit = Toolkit.getDefaultToolkit();
+				Clipboard clipboard = toolkit.getSystemClipboard();
+				TransferableImage content = new TransferableImage(image);
+				//DataHandler content = new DataHandler(image,"image/x-java-image");
+				
+				try { clipboard.setContents(content,null); }
+				catch (IllegalStateException e1) { e1.printStackTrace(); }
+				
+				processInEventThread(()->comp.setEnabled(true));
+			});
 			
-			SwingUtilities.invokeLater(()->comp.setEnabled(true));
+			
 		}).start();
 	}
 	
@@ -241,7 +267,7 @@ public class BumpMappingTest {
 		comp.setSelected(isSelected);
 		if (setValue!=null) comp.addActionListener(e->{
 			setValue.accept(comp.isSelected());
-			bumpMapping.resetImage();
+			bumpMapping.reset();
 			resultView.repaint();
 		});
 		return comp;
@@ -264,7 +290,7 @@ public class BumpMappingTest {
 		JTextField comp = new JTextField(Double.toString(value));
 		Consumer<Double> modifiedSetValue = d->{
 			setValue.accept(d);
-			bumpMapping.resetImage();
+			bumpMapping.reset();
 			resultView.repaint();
 		};
 		Color defaultBG = comp.getBackground();
@@ -296,12 +322,12 @@ public class BumpMappingTest {
 
 	private JButton createColorbutton(Color initColor, String dialogTitle, Consumer<Color> setcolor) {
 		JButton colorbutton = HSColorChooser.createColorbutton(
-				initColor, mainwindow, dialogTitle, HSColorChooser.PARENT_CENTER,
-				color->{
-					setcolor.accept(color);
-					bumpMapping.resetImage();
-					resultView.repaint();
-				}
+			initColor, mainwindow, dialogTitle, HSColorChooser.PARENT_CENTER,
+			color->{
+				setcolor.accept(color);
+				bumpMapping.reset();
+				resultView.repaint();
+			}
 		);
 		colorbutton.setPreferredSize(new Dimension(30,30));
 		return colorbutton;
@@ -1004,8 +1030,22 @@ public class BumpMappingTest {
 			this.bumpMapping = bumpMapping;
 		}
 
-		public BufferedImage renderScaledImage(float scale) {
-			return bumpMapping.renderScaledImage_uncached(width,height,scale);
+		public BufferedImage renderScaledImage(float scale, ProgressDialog pd) {
+			return bumpMapping.renderImage_uncached(width,height,scale,new BumpMapping.RenderProgressListener() {
+				private int lastX = 0;
+				@Override public void setSize(int width, int height) {
+					this.lastX = 0;
+					processInEventThreadAndWait(()->{
+						pd.setTaskTitle("Render Image ("+width+"x"+height+" Pixels)");
+						pd.setValue(0, width);
+					});
+				}
+				@Override public void wasRendered(int x, int y) {
+					if (lastX==x) return;
+					processInEventThread(()->pd.setValue(x+1));
+					lastX = x+1;
+				}
+			});
 		}
 
 		@Override
