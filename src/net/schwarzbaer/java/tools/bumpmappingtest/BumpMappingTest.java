@@ -46,14 +46,14 @@ import net.schwarzbaer.gui.HSColorChooser;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.image.BumpMapping;
-import net.schwarzbaer.image.BumpMapping.ExtraNormalFunctionPolar;
+import net.schwarzbaer.image.BumpMapping.ExtraNormalFunction;
 import net.schwarzbaer.image.BumpMapping.Indexer;
 import net.schwarzbaer.image.BumpMapping.Normal;
 import net.schwarzbaer.image.BumpMapping.NormalFunction;
+import net.schwarzbaer.image.BumpMapping.NormalFunction.Polar.RotatedProfile;
 import net.schwarzbaer.image.BumpMapping.NormalXY;
 import net.schwarzbaer.image.BumpMapping.OverSampling;
 import net.schwarzbaer.image.BumpMapping.ProfileXY;
-import net.schwarzbaer.image.BumpMapping.RotatedProfile;
 import net.schwarzbaer.image.BumpMapping.Shading;
 import net.schwarzbaer.image.BumpMapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.BumpMapping.Shading.MaterialShading;
@@ -479,7 +479,7 @@ public class BumpMappingTest {
 	
 	private enum NormalFunctions {
 		Simple(bm->{
-			bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) ->{
+			bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) ->{
 					Normal n;
 					if      (30<r && r<40) n = new Normal(-1,0,1).normalize().rotateZ(w);
 					else if (60<r && r<70) n = new Normal(1,0,1).normalize().rotateZ(w);
@@ -492,7 +492,7 @@ public class BumpMappingTest {
 			Normal vFace  = new Normal( 0,0,1);
 			Normal vInner = new Normal(-1,0,1);
 			Normal vOuter = new Normal( 1,0,3);
-			bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) -> {
+			bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) -> {
 				Normal n;
 				int r1 = radius/2;
 				int r2 = radius/2+5;
@@ -564,17 +564,17 @@ public class BumpMappingTest {
 				double maxRB = radius-tr*2+10 -profileBigLine  .maxR; maxRB = radius;
 				double minRS = radius/2+5+tr*2+profileSmallLine.maxR; minRS = radius-17;
 				double maxRS = radius-tr*2+10 -profileSmallLine.maxR; maxRS = radius+5;
-				ExtraNormalFunctionPolar.LineOnX bigLine   = new ExtraNormalFunctionPolar.LineOnX(minRB, maxRB, profileBigLine   );
-				ExtraNormalFunctionPolar.LineOnX smallLine = new ExtraNormalFunctionPolar.LineOnX(minRS, maxRS, profileSmallLine );
+				ExtraNormalFunction.Polar.LineOnX bigLine   = new ExtraNormalFunction.Polar.LineOnX(minRB, maxRB, profileBigLine   );
+				ExtraNormalFunction.Polar.LineOnX smallLine = new ExtraNormalFunction.Polar.LineOnX(minRS, maxRS, profileSmallLine );
 				double angleIn  = 75.0;
 				double angleOut = 0;
 				bm.setNormalFunction(
 					createRotaryCtrlProfile(radius,5,15,tr,5).setExtras(
-						new ExtraNormalFunctionPolar.Group(
-							new ExtraNormalFunctionPolar.Stencil(
+						new ExtraNormalFunction.Polar.Group(
+							new ExtraNormalFunction.Polar.Stencil(
 								(w,r)->r<=radius,
-								new ExtraNormalFunctionPolar.Group(
-									new ExtraNormalFunctionPolar.Rotated(angleIn    , bigLine)
+								new ExtraNormalFunction.Polar.Group(
+									new ExtraNormalFunction.Polar.Rotated(angleIn    , bigLine)
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
@@ -584,17 +584,17 @@ public class BumpMappingTest {
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine)
 								)
 							),
-							new ExtraNormalFunctionPolar.Stencil(
+							new ExtraNormalFunction.Polar.Stencil(
 									(w,r)->r>radius,
-									new ExtraNormalFunctionPolar.Group(
-										new ExtraNormalFunctionPolar.Rotated(angleOut    , smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunctionPolar.Rotated(angleOut+=45, smallLine)
+									new ExtraNormalFunction.Polar.Group(
+										new ExtraNormalFunction.Polar.Rotated(angleOut    , smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine)
 									)
 								)
 						)
@@ -602,7 +602,7 @@ public class BumpMappingTest {
 				);
 			}
 		}),
-		Spirale(bm -> bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) -> {
+		Spirale(bm -> bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) -> {
 			double pAmpl = 60;
 			double rAmpl = r + w*pAmpl/Math.PI;
 			double pSpir = 5;
@@ -616,7 +616,7 @@ public class BumpMappingTest {
 			Normal vFace  = new Normal( 0,0,1);
 			double radius = 100;
 			double transition = 3;
-			bm.setNormalFunction(new NormalFunction.SimplePolar((w, r) ->{
+			bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) ->{
 				Normal n;
 				if (r < radius)
 					n = new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
