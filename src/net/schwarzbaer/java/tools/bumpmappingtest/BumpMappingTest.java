@@ -50,15 +50,15 @@ import net.schwarzbaer.image.bumpmapping.BumpMapping.ExtraNormalFunction;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Indexer;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalFunction;
+import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalFunction.Polar.RotatedProfile;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.OverSampling;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.ProfileXY;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Shading;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalFunction.Polar.RotatedProfile;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Shading.GUISurfaceShading;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Shading.MaterialShading;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Shading.MixedShading;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Shading.NormalImage;
+import net.schwarzbaer.image.bumpmapping.Shading;
+import net.schwarzbaer.image.bumpmapping.Shading.GUISurfaceShading;
+import net.schwarzbaer.image.bumpmapping.Shading.MaterialShading;
+import net.schwarzbaer.image.bumpmapping.Shading.MixedShading;
+import net.schwarzbaer.image.bumpmapping.Shading.NormalImage;
 
 public class BumpMappingTest {
 
