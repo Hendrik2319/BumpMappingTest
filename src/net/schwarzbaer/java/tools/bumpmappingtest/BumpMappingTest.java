@@ -402,7 +402,7 @@ public class BumpMappingTest {
 	}
 
 	private void setNormalFunction(NormalFunctions nf) {
-		nf.setNormalFunction.accept(bumpMapping);
+		bumpMapping.setNormalFunction(nf.createNormalFunction.get());
 		resultView.repaint();
 	}
 

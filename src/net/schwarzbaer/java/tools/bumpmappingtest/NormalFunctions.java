@@ -6,9 +6,8 @@ import java.awt.geom.Point2D;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.function.BiConsumer;
-import java.util.function.Consumer;
+import java.util.function.Supplier;
 
-import net.schwarzbaer.image.bumpmapping.BumpMapping;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
@@ -18,21 +17,21 @@ import net.schwarzbaer.image.bumpmapping.NormalFunction.Polar.RotatedProfile;
 import net.schwarzbaer.image.bumpmapping.ProfileXY;
 
 enum NormalFunctions {
-		Simple(bm->{
-			bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) ->{
-					Normal n;
-					if      (30<r && r<40) n = new Normal(-1,0,1).normalize().rotateZ(w);
-					else if (60<r && r<70) n = new Normal(1,0,1).normalize().rotateZ(w);
-					else                   n = new Normal(0,0,1);
-					return n;
-			}));
-		}),
-		RotaryCtrl(bm->{
+		Simple(() ->
+			new NormalFunction.Polar.Simple((w, r) ->{
+				Normal n;
+				if      (30<r && r<40) n = new Normal(-1,0,1).normalize().rotateZ(w);
+				else if (60<r && r<70) n = new Normal(1,0,1).normalize().rotateZ(w);
+				else                   n = new Normal(0,0,1);
+				return n;
+			})
+		),
+		RotaryCtrl(() -> {
 			int radius = 100;
 			Normal vFace  = new Normal( 0,0,1);
 			Normal vInner = new Normal(-1,0,1);
 			Normal vOuter = new Normal( 1,0,3);
-			bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) -> {
+			return new NormalFunction.Polar.Simple((w, r) -> {
 				Normal n;
 				int r1 = radius/2;
 				int r2 = radius/2+5;
@@ -46,9 +45,9 @@ enum NormalFunctions {
 				//else if (r4  <r && r<=r4+2) n = Vector3D.blend(r, r4  , r4+2, vOuter, vFace);
 				else                        n = vFace;
 				return n.normalize().rotateZ(w);
-			}));
+			});
 		}),
-		RotaryCtrl_CNF(bm -> {
+		RotaryCtrl_CNF(() -> {
 			int radius = 100;
 			int r1 = radius/2;
 			int r2 = radius/2+5;
@@ -57,64 +56,57 @@ enum NormalFunctions {
 			NormalXY vFace  = new NormalXY(0,1);
 			NormalXY vInner = ProfileXY.Constant.computeNormal(r1, r2, 0, 5);
 			NormalXY vOuter = ProfileXY.Constant.computeNormal(r3, r4, 5, 0);
-			bm.setNormalFunction(
-				new RotatedProfile(
-					new ProfileXY.Group(
-						new ProfileXY.Constant   (0, r1),
-						new ProfileXY.Constant   (r1  , r2  , 0, 5),
-						new ProfileXY.LinearBlend(r2  , r2+2, vInner, vFace),
-						new ProfileXY.Constant   (r2+2, r3-2),
-						new ProfileXY.LinearBlend(r3-2, r3  , vFace, vOuter),
-						new ProfileXY.Constant   (r3  , r4  , 5, 0),
-						new ProfileXY.Constant   (r4  , Double.POSITIVE_INFINITY)
-					)
+			return new RotatedProfile(
+				new ProfileXY.Group(
+					new ProfileXY.Constant   (0, r1),
+					new ProfileXY.Constant   (r1  , r2  , 0, 5),
+					new ProfileXY.LinearBlend(r2  , r2+2, vInner, vFace),
+					new ProfileXY.Constant   (r2+2, r3-2),
+					new ProfileXY.LinearBlend(r3-2, r3  , vFace, vOuter),
+					new ProfileXY.Constant   (r3  , r4  , 5, 0),
+					new ProfileXY.Constant   (r4  , Double.POSITIVE_INFINITY)
 				)
 			);
 		}),
-		RotaryCtrl_CNF2(bm -> {
-			bm.setNormalFunction(
-				createRotaryCtrlProfile(100,5,15,2,5)
+		RotaryCtrl_CNF2(() ->
+			createRotaryCtrlProfile(100,5,15,2,5)
+		),
+		RotaryCtrl_CNF2_Extras(() -> {
+			double radius = 55;
+			double tr = 2;
+			double ramp = 1;
+			double lineHeight = 2;
+			
+			NormalXY vFace = new NormalXY(0,1);
+			NormalXY vRamp = ProfileXY.Constant.computeNormal(0,ramp, 0,lineHeight);
+			
+			ProfileXY.Group profileBigLine = new ProfileXY.Group(
+				new ProfileXY.Constant   (0.0     , 0.5     ),
+				new ProfileXY.RoundBlend (0.5     , 1.5     , vFace, vRamp),
+				new ProfileXY.Constant   (1.5     , 1.5+ramp, 0,lineHeight),
+				new ProfileXY.RoundBlend (1.5+ramp, 2.5+ramp, vRamp, vFace)
 			);
-		}),
-		RotaryCtrl_CNF2_Extras(new Consumer<BumpMapping>() {
-			@Override
-			public void accept(BumpMapping bm) {
-				double radius = 55;
-				double tr = 2;
-				double ramp = 1;
-				double lineHeight = 2;
-				
-				NormalXY vFace = new NormalXY(0,1);
-				NormalXY vRamp = ProfileXY.Constant.computeNormal(0,ramp, 0,lineHeight);
-				
-				ProfileXY.Group profileBigLine = new ProfileXY.Group(
-					new ProfileXY.Constant   (0.0     , 0.5     ),
-					new ProfileXY.RoundBlend (0.5     , 1.5     , vFace, vRamp),
-					new ProfileXY.Constant   (1.5     , 1.5+ramp, 0,lineHeight),
-					new ProfileXY.RoundBlend (1.5+ramp, 2.5+ramp, vRamp, vFace)
+			ProfileXY.Group profileSmallLine = new ProfileXY.Group(
+					new ProfileXY.Constant   (0.0       , 0.2       ),
+					new ProfileXY.RoundBlend (0.2       , 0.5       , vFace, vRamp),
+					new ProfileXY.Constant   (0.5       , 0.5+ramp/2, 0,lineHeight/2),
+					new ProfileXY.RoundBlend (0.5+ramp/2, 0.8+ramp/2, vRamp, vFace)
 				);
-				ProfileXY.Group profileSmallLine = new ProfileXY.Group(
-						new ProfileXY.Constant   (0.0       , 0.2       ),
-						new ProfileXY.RoundBlend (0.2       , 0.5       , vFace, vRamp),
-						new ProfileXY.Constant   (0.5       , 0.5+ramp/2, 0,lineHeight/2),
-						new ProfileXY.RoundBlend (0.5+ramp/2, 0.8+ramp/2, vRamp, vFace)
-					);
-				
-				double minRB = radius/2+5+tr*2+profileBigLine  .maxR;
-				double maxRB = radius-tr*2+10 -profileBigLine  .maxR; maxRB = radius;
-				double minRS = radius/2+5+tr*2+profileSmallLine.maxR; minRS = radius-17;
-				double maxRS = radius-tr*2+10 -profileSmallLine.maxR; maxRS = radius+5;
-				ExtraNormalFunction.Polar.LineOnX bigLine   = new ExtraNormalFunction.Polar.LineOnX(minRB, maxRB, profileBigLine   );
-				ExtraNormalFunction.Polar.LineOnX smallLine = new ExtraNormalFunction.Polar.LineOnX(minRS, maxRS, profileSmallLine );
-				double angleIn  = 75.0;
-				double angleOut = 0;
-				bm.setNormalFunction(
-					createRotaryCtrlProfile(radius,5,15,tr,5).setExtras(
+			
+			double minRB = radius/2+5+tr*2+profileBigLine  .maxR;
+			double maxRB = radius-tr*2+10 -profileBigLine  .maxR; maxRB = radius;
+			double minRS = radius/2+5+tr*2+profileSmallLine.maxR; minRS = radius-17;
+			double maxRS = radius-tr*2+10 -profileSmallLine.maxR; maxRS = radius+5;
+			ExtraNormalFunction.Polar.LineOnX bigLine   = new ExtraNormalFunction.Polar.LineOnX(minRB, maxRB, profileBigLine   );
+			ExtraNormalFunction.Polar.LineOnX smallLine = new ExtraNormalFunction.Polar.LineOnX(minRS, maxRS, profileSmallLine );
+			double angleIn  = 75.0;
+			double angleOut = 0;
+			return createRotaryCtrlProfile(radius,5,15,tr,5).setExtras(
+				new ExtraNormalFunction.Polar.Group(
+					new ExtraNormalFunction.Polar.Stencil(
+						(w1,r1)->r1<=radius,
 						new ExtraNormalFunction.Polar.Group(
-							new ExtraNormalFunction.Polar.Stencil(
-								(w,r)->r<=radius,
-								new ExtraNormalFunction.Polar.Group(
-									new ExtraNormalFunction.Polar.Rotated(angleIn    , bigLine)
+							new ExtraNormalFunction.Polar.Rotated(angleIn    , bigLine)
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
@@ -122,41 +114,41 @@ enum NormalFunctions {
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine),
 //									new ExtraNormalFunctionPolar.Rotated(angleIn+=45, smallLine)
-								)
-							),
-							new ExtraNormalFunction.Polar.Stencil(
-									(w,r)->r>radius,
-									new ExtraNormalFunction.Polar.Group(
-										new ExtraNormalFunction.Polar.Rotated(angleOut    , smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
-										new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine)
-									)
-								)
 						)
-					)
-				);
-			}
+					),
+					new ExtraNormalFunction.Polar.Stencil(
+							(w2,r2)->r2>radius,
+							new ExtraNormalFunction.Polar.Group(
+								new ExtraNormalFunction.Polar.Rotated(angleOut    , smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine),
+								new ExtraNormalFunction.Polar.Rotated(angleOut+=45, smallLine)
+							)
+						)
+				)
+			);
 		}),
-		Spirale(bm -> bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) -> {
-			double pAmpl = 60;
-			double rAmpl = r + w*pAmpl/Math.PI;
-			double pSpir = 5;
-			double rSpir = r + w*pSpir/Math.PI;
-			double ampl = Math.sin(rAmpl/pAmpl*Math.PI); ampl *= ampl;
-			double spir = Math.sin(rSpir/pSpir*Math.PI) * ampl*ampl;
-			double f = 0.9; // 0.7; // 1; // 1/Math.sqrt(2); 
-			return new Normal(f*spir,0,Math.sqrt(1-f*f*spir*spir)).normalize().rotateZ(w);
-		}))),
-		HemiSphere(bm->{
+		Spirale(() ->
+			new NormalFunction.Polar.Simple((w, r) -> {
+				double pAmpl = 60;
+				double rAmpl = r + w*pAmpl/Math.PI;
+				double pSpir = 5;
+				double rSpir = r + w*pSpir/Math.PI;
+				double ampl = Math.sin(rAmpl/pAmpl*Math.PI); ampl *= ampl;
+				double spir = Math.sin(rSpir/pSpir*Math.PI) * ampl*ampl;
+				double f = 0.9; // 0.7; // 1; // 1/Math.sqrt(2); 
+				return new Normal(f*spir,0,Math.sqrt(1-f*f*spir*spir)).normalize().rotateZ(w);
+			})
+		),
+		HemiSphere(() -> {
 			Normal vFace  = new Normal( 0,0,1);
 			double radius = 100;
 			double transition = 3;
-			bm.setNormalFunction(new NormalFunction.Polar.Simple((w, r) ->{
+			return new NormalFunction.Polar.Simple((w, r) ->{
 				Normal n;
 				if (r < radius)
 					n = new Normal(r,0,Math.sqrt(radius*radius-r*r)).normalize().rotateZ(w);
@@ -167,97 +159,97 @@ enum NormalFunctions {
 						n = vFace;
 				}
 				return n;
-			}));
+			});
 		}),
-		HemiSphere2(bm->{
+		HemiSphere2(() -> {
 			Normal vFace  = new Normal( 0,0,1);
-			bm.setNormalFunction(new NormalFunction.Simple((x,y,width,height)->{
+			return new NormalFunction.Simple((x,y,width,height)->{
 				Normal n = NormalFunctions.getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
 				if (n == null) return vFace;
 				return n;
-			}));
+			});
 		}),
-		HemiSphere_CNF_linear(bm -> {
+		HemiSphere_CNF_linear(() -> {
 			double r1 = 100;
 			double r2 = r1+3;
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.LinearBlend( 0, r1, new NormalXY(0,1), new NormalXY(1,0)),
 				new ProfileXY.LinearBlend(r1, r2, new NormalXY(1,0), new NormalXY(0,1)),
 				new ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphere_CNF_round(bm -> {
+		HemiSphere_CNF_round(() -> {
 			double r1 = 100;
 			double r2 = r1+3;
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.RoundBlend( 0, r1, new NormalXY(0,1), new NormalXY(1,0)),
 				new ProfileXY.RoundBlend(r1, r2, new NormalXY(1,0), new NormalXY(0,1)),
 				new ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphere_CNF2_linear(bm -> {
+		HemiSphere_CNF2_linear(() -> {
 			double r1 = 60;
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,0);
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.LinearBlend( 0, r1, face, mid),
 				new ProfileXY.LinearBlend(r1, r2, mid, face),
 				new ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphere_CNF2_round(bm -> {
+		HemiSphere_CNF2_round(() -> {
 			double r1 = 60;
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,0);
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.RoundBlend( 0, r1, face, mid),
 				new ProfileXY.RoundBlend(r1, r2, mid, face),
 				new ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphere_CNF3_linear(bm -> {
+		HemiSphere_CNF3_linear(() -> {
 			double r1 = 60;
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,2).normalize();
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.LinearBlend( 0, r1, face, mid),
 				new ProfileXY.LinearBlend(r1, r2, mid, face),
 				new ProfileXY.Constant   (r2, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphere_CNF3_round(bm -> {
+		HemiSphere_CNF3_round(() -> {
 			double r1 = 60;
 			double r2 = 120;
 			NormalXY face = new NormalXY(0,1);
 			NormalXY mid  = new NormalXY(1,2).normalize();
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.RoundBlend( 0, r1, face, mid),
 				new ProfileXY.RoundBlend(r1, r2, mid, face),
 				new ProfileXY.Constant  (r2, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphere_CNF4_round(bm -> {
+		HemiSphere_CNF4_round(() -> {
 			NormalXY face = new NormalXY( 0  ,1  );
 			NormalXY mid1 = new NormalXY(-0.1,1  ).normalize();
 			NormalXY mid2 = new NormalXY( 1  ,0.1).normalize();
-			bm.setNormalFunction( new RotatedProfile( new ProfileXY.Group(
+			return new RotatedProfile( new ProfileXY.Group(
 				new ProfileXY.RoundBlend(  0, 40, face, mid1),
 				new ProfileXY.RoundBlend( 40, 80, mid1, mid2),
 				new ProfileXY.RoundBlend( 80,120, mid2, face),
 				new ProfileXY.Constant  (120, Double.POSITIVE_INFINITY)
-			)));
+			));
 		}),
-		HemiSphereBubblesQ(bm -> {
-			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p)->{
+		HemiSphereBubblesQ(() ->
+			new BubbleRaster(100,3,(raster,p)->{
 				p.x = Math.round(p.x/raster)*raster;
 				p.y = Math.round(p.y/raster)*raster;
-			}));
-		}),
-		HemiSphereBubblesT(bm -> {
-			bm.setNormalFunction(new BubbleRaster(100,3,(raster,p) -> {
+			})
+		),
+		HemiSphereBubblesT(() ->
+			new BubbleRaster(100,3,(raster,p) -> {
 				double f3 = p.y/(raster*Math.sin(Math.PI/3));
 				double f2 = p.x/raster-f3/2;
 				double f1 = 1-f2-f3;
@@ -278,9 +270,9 @@ enum NormalFunctions {
 				
 				p.y = f3*(raster*Math.sin(Math.PI/3));
 				p.x = raster*(f2+f3/2);
-			}));
-		}),
-		Noise(bm -> {
+			})
+		),
+		Noise(() -> {
 			int width = 400;
 			int height = 300;
 			Random rnd = new Random();
@@ -288,31 +280,31 @@ enum NormalFunctions {
 			for (int x1=0; x1<width; ++x1)
 				for (int y1=0; y1<height; ++y1)
 					normalMap[x1][y1] = new Normal(rnd.nextDouble(),0,1).normalize().rotateZ(rnd.nextDouble()*Math.PI*2);
-			bm.setNormalFunction( new NormalMap(normalMap,false) );
+			return new NormalMap(normalMap,false);
 		}),
 		
-		NoiseHeight1(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,   10).heightMap,0))),
-		NoiseHeight2(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,    5).heightMap,0))),
-		NoiseHeight3(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,    2).heightMap,0))),
-		NoiseHeight4(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,    1).heightMap,0))),
-		NoiseHeight5(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0))),
-		NoiseHeight6(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.25f))),
-		NoiseHeight7(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.5f ))),
-		NoiseHeight8(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.75f))),
+		NoiseHeight1(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,   10).heightMap,0)),
+		NoiseHeight2(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,    5).heightMap,0)),
+		NoiseHeight3(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,    2).heightMap,0)),
+		NoiseHeight4(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,    1).heightMap,0)),
+		NoiseHeight5(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0)),
+		NoiseHeight6(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.25f)),
+		NoiseHeight7(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.5f )),
+		NoiseHeight8(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594, 0.5f).heightMap,0.75f)),
 		
-		RandomHeight1(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.25f).heightMap,0))),
-		RandomHeight2(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.50f).heightMap,0))),
-		RandomHeight3(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.75f).heightMap,0))),
-		RandomHeight4(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 1.00f).heightMap,0))),
-		RandomHeight5(bm -> bm.setNormalFunction(NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 2.00f).heightMap,0))),
+		RandomHeight1(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.25f).heightMap,0)),
+		RandomHeight2(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.50f).heightMap,0)),
+		RandomHeight3(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 0.75f).heightMap,0)),
+		RandomHeight4(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 1.00f).heightMap,0)),
+		RandomHeight5(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 2.00f).heightMap,0)),
 		
-		RandomHeightNColor1(bm -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); bm.setNormalFunction(NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5)); }),
-		RandomHeightNColor2(bm -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); bm.setNormalFunction(NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5)); }),
-		RandomHeightNColor3(bm -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); bm.setNormalFunction(NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5)); }),
-		RandomHeightNColor4(bm -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); bm.setNormalFunction(NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5)); }),
-		RandomHeightNColor5(bm -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); bm.setNormalFunction(NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5)); }),
+		RandomHeightNColor1(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor2(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor3(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor4(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor5(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
 		
-		Spikes(bm -> {
+		Spikes(() -> {
 			int size = 21;
 			double maxSpikeHeight = 50;
 			int spikeSize = 20;
@@ -333,7 +325,7 @@ enum NormalFunctions {
 					else colors[x1][y1] = null;
 				}
 			
-			bm.setNormalFunction(new NormalFunction.Simple((x_, y_, width_, height_) -> {
+			return new NormalFunction.Simple((x_, y_, width_, height_) -> {
 				int x2 = (int) Math.round(x_-(width_ /2-width/2));
 				int y2 = (int) Math.round(y_-(height_/2-width/2));
 				if (x2<0 || x2>=width || y2<0 || y2>=width)
@@ -373,13 +365,13 @@ enum NormalFunctions {
 					}
 					
 				}
-			}));
+			});
 
 		}),
 		;
-		Consumer<BumpMapping> setNormalFunction;
-		NormalFunctions(Consumer<BumpMapping> setNormalFunction) {
-			this.setNormalFunction = setNormalFunction;
+		Supplier<NormalFunction> createNormalFunction;
+		NormalFunctions(Supplier<NormalFunction> createNormalFunction) {
+			this.createNormalFunction = createNormalFunction;
 		}
 		
 		private static RotatedProfile createRotaryCtrlProfile(double radius, double innerRing, double outerRing, double transition, double height) {
