@@ -12,7 +12,9 @@ import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
 import net.schwarzbaer.image.bumpmapping.NormalFunction;
+import net.schwarzbaer.image.bumpmapping.NormalFunction.InterpolatingNormalMap;
 import net.schwarzbaer.image.bumpmapping.NormalFunction.NormalMap;
+import net.schwarzbaer.image.bumpmapping.NormalFunction.NormalMap.NormalMapData;
 import net.schwarzbaer.image.bumpmapping.NormalFunction.Polar.RotatedProfile;
 import net.schwarzbaer.image.bumpmapping.ProfileXY;
 
@@ -164,7 +166,7 @@ enum NormalFunctions {
 		HemiSphere2(() -> {
 			Normal vFace  = new Normal( 0,0,1);
 			return new NormalFunction.Simple((x,y,width,height)->{
-				Normal n = NormalFunctions.getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
+				Normal n = getBubbleNormal(x-width/2.0,y-height/2.0, 100, 3, vFace, false);
 				if (n == null) return vFace;
 				return n;
 			});
@@ -272,15 +274,18 @@ enum NormalFunctions {
 				p.x = raster*(f2+f3/2);
 			})
 		),
-		Noise(() -> {
-			int width = 400;
-			int height = 300;
-			Random rnd = new Random();
-			Normal[][] normalMap = new Normal[width][height];
-			for (int x1=0; x1<width; ++x1)
-				for (int y1=0; y1<height; ++y1)
-					normalMap[x1][y1] = new Normal(rnd.nextDouble(),0,1).normalize().rotateZ(rnd.nextDouble()*Math.PI*2);
-			return new NormalMap(normalMap,false);
+		Noise(new Supplier<NormalFunction>() {
+			@Override
+			public NormalFunction get() {
+				int width = 400;
+				int height = 300;
+				Random rnd = new Random();
+				NormalMapData normalMap = new NormalMap.NormalMapData(width,height);
+				for (int x1=0; x1<width; ++x1)
+					for (int y1=0; y1<height; ++y1)
+						normalMap.set(x1,y1,new Normal(rnd.nextDouble(),0,1).normalize().rotateZ(rnd.nextDouble()*Math.PI*2));
+				return new NormalMap(normalMap,false);
+			}
 		}),
 		
 		NoiseHeight1(() -> NormalMap.createFromHeightMap(new NoiseHeightMap(400, 300, 1594263594,   10).heightMap,0)),
@@ -298,11 +303,17 @@ enum NormalFunctions {
 		RandomHeight4(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 1.00f).heightMap,0)),
 		RandomHeight5(() -> NormalMap.createFromHeightMap(new RandomHeightMap(400, 300, 1594263594, 2.00f).heightMap,0)),
 		
-		RandomHeightNColor1(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
-		RandomHeightNColor2(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
-		RandomHeightNColor3(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
-		RandomHeightNColor4(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
-		RandomHeightNColor5(() -> { NormalFunctions.RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5); }),
+		RandomHeightNColor1(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, true); }),
+		RandomHeightNColor2(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, true); }),
+		RandomHeightNColor3(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, true); }),
+		RandomHeightNColor4(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, true); }),
+		RandomHeightNColor5(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, true); }),
+		
+		RandomHeightNColor1Int(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.25f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, InterpolatingNormalMap::new, true); }),
+		RandomHeightNColor2Int(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.50f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, InterpolatingNormalMap::new, true); }),
+		RandomHeightNColor3Int(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 0.75f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, InterpolatingNormalMap::new, true); }),
+		RandomHeightNColor4Int(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 1.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, InterpolatingNormalMap::new, true); }),
+		RandomHeightNColor5Int(() -> { RandomHeightMap map = new RandomHeightMap(400, 300, 1594263594, 2.00f, Color.BLUE, Color.ORANGE); return NormalMap.createFromHeightMap(map.heightMap, map.colorMap, 0.5, InterpolatingNormalMap::new, true); }),
 		
 		Spikes(() -> {
 			int size = 21;
@@ -454,7 +465,7 @@ enum NormalFunctions {
 				double xC = x-width/2.0;
 				double yC = y-height/2.0;
 				
-				n = NormalFunctions.getBubbleNormal(xC,yC, radius, transition, vFace, false);
+				n = getBubbleNormal(xC,yC, radius, transition, vFace, false);
 				if (n!=null) return n;
 				
 				//double xM = Math.round(xC/raster)*raster;
@@ -468,7 +479,7 @@ enum NormalFunctions {
 				if (Math.sqrt(xM*xM+yM*yM) < radius+transition+radiusB+transitionB)
 					return vFace;
 				
-				n = NormalFunctions.getBubbleNormal(xC-xM,yC-yM, radiusB, transitionB, vFace, false);
+				n = getBubbleNormal(xC-xM,yC-yM, radiusB, transitionB, vFace, false);
 				if (n == null)
 					return vFace;
 				
