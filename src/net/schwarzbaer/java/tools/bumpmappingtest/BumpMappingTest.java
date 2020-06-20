@@ -50,6 +50,9 @@ import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.OverSampling;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Cart.AlphaCharSquence;
+import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Centerer;
+import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Polar;
+import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Polar.BentCartExtra;
 import net.schwarzbaer.image.bumpmapping.NormalFunction;
 import net.schwarzbaer.image.bumpmapping.ProfileXY;
 import net.schwarzbaer.image.bumpmapping.Shading;
@@ -83,8 +86,12 @@ public class BumpMappingTest {
 	private JPanel optionsPanel = null;
 	private JPanel currentValuePanel=null;
 	private StandardMainWindow mainwindow = null;
-	private TextOverlay textOverlay = null;
-	private ExtraNormalFunction.Centerer textOverlayCenterer = null;
+	private CartTextOverlay  cartTextOverlay = null;
+	private PolarTextOverlay polarTextOverlay = null;
+	private JPanel currentTextOptionPanel = null;
+	private JPanel cartTextOptionPanel = null;
+	private JPanel polarTextOptionPanel = null;
+	private JPanel dummyTextOptionPanel = null;
 	
 	private void createGUI() {
 		GridBagConstraints c = new GridBagConstraints();
@@ -143,15 +150,19 @@ public class BumpMappingTest {
 		selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         this::setNormalFunction),GBC.setGridPos(c,1,1));
 		selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                this::setShading       ),GBC.setGridPos(c,1,2));
 		
-		textOverlay = new TextOverlay("MxXBabcd", -100, -50, 0.3, 5, 1);
-		textOverlayCenterer = new ExtraNormalFunction.Centerer(textOverlay.alphaCharSquence);
+		cartTextOverlay = new CartTextOverlay("MxXBabcd", -100, -50, 30, 5, 1);
+		cartTextOptionPanel = cartTextOverlay.createOptionsPanel();
 		
-		JPanel textPanel = textOverlay.createOptionsPanel();
+		polarTextOverlay = new PolarTextOverlay("MxXBabcd", 100, -90, 30, 5, 1);
+		polarTextOptionPanel = polarTextOverlay.createOptionsPanel();
+		
+		dummyTextOptionPanel = new JPanel(new GridBagLayout());
+		dummyTextOptionPanel.setBorder(BorderFactory.createTitledBorder(""));
 		
 		optionsPanel = new JPanel(new BorderLayout(3,3));
 		optionsPanel.setBorder(BorderFactory.createTitledBorder("Options"));
 		optionsPanel.add(selectionPanel,BorderLayout.NORTH);
-		optionsPanel.add(textPanel,BorderLayout.SOUTH);
+		//optionsPanel.add(textPanel,BorderLayout.SOUTH);
 		
 		for (Shadings sh:Shadings.values()) {
 			sh.valuePanel = new JPanel(new GridBagLayout());
@@ -436,11 +447,25 @@ public class BumpMappingTest {
 	}
 
 	private void setNormalFunction(NormalFunctions nf) {
+		if (currentTextOptionPanel!=null) optionsPanel.remove(currentTextOptionPanel);
 		NormalFunction normalFunction = nf.createNormalFunction.get();
+		
 		if (normalFunction instanceof ExtraNormalFunction.Host) {
-			ExtraNormalFunction.Host cartHost = (ExtraNormalFunction.Host) normalFunction;
-			cartHost.setExtras(textOverlayCenterer);
-		}
+			ExtraNormalFunction.Host host = (ExtraNormalFunction.Host) normalFunction;
+			host.setExtras(cartTextOverlay.getExtraObj());
+			currentTextOptionPanel = cartTextOptionPanel;
+			
+		} else if (normalFunction instanceof ExtraNormalFunction.PolarHost) {
+			ExtraNormalFunction.PolarHost host = (ExtraNormalFunction.PolarHost) normalFunction;
+			host.setExtras(polarTextOverlay.getExtraObj());
+			currentTextOptionPanel = polarTextOptionPanel;
+			
+		} else
+			currentTextOptionPanel = dummyTextOptionPanel;
+		
+		optionsPanel.add(currentTextOptionPanel, BorderLayout.SOUTH);
+		optionsPanel.revalidate();
+		optionsPanel.repaint();
 		bumpMapping.setNormalFunction(normalFunction);
 		resultView.repaint();
 	}
@@ -460,25 +485,106 @@ public class BumpMappingTest {
 		return comp;
 	}
 	
-	private class TextOverlay {
+	private class PolarTextOverlay {
 
-		public String text;
-		public double textPosX;
-		public double textPosY;
-		public double fontSize;
-		public double lineWidth;
-		public double lineHeight;
+		private String text;
+		private double radius_px;
+		private double angle_deg;
+		private double fontSize_px;
+		private double lineWidth;
+		private double lineHeight;
 		private AlphaCharSquence alphaCharSquence;
-		
-		private TextOverlay(String text, double textPosX, double textPosY, double fontSize, double lineWidth, double lineHeight) {
-			this.text       = text      ;
-			this.textPosX   = textPosX  ;
-			this.textPosY   = textPosY  ;
-			this.fontSize   = fontSize  ;
-			this.lineWidth  = lineWidth ;
+		private BentCartExtra bender;
+
+		public PolarTextOverlay(String text, double radius_px, double angle_deg, double fontSize_px, double lineWidth, double lineHeight) {
+			this.text = text;
+			this.radius_px = radius_px;
+			this.angle_deg = angle_deg;
+			this.fontSize_px = fontSize_px;
+			this.lineWidth = lineWidth;
 			this.lineHeight = lineHeight;
 			ProfileXY profile = createProfile();
-			alphaCharSquence = new ExtraNormalFunction.Cart.AlphaCharSquence(this.textPosX, this.textPosY, this.fontSize, profile, this.text);
+			alphaCharSquence = new ExtraNormalFunction.Cart.AlphaCharSquence(0,0, this.fontSize_px/100, profile, this.text);
+			bender = new ExtraNormalFunction.Polar.BentCartExtra(this.radius_px, this.angle_deg/180*Math.PI, alphaCharSquence);
+		}
+
+		public Polar getExtraObj() {
+			return bender;
+		}
+
+		public JPanel createOptionsPanel() {
+			GridBagConstraints c = new GridBagConstraints();
+			JPanel textPanel = new JPanel(new GridBagLayout());
+			textPanel.setBorder(BorderFactory.createTitledBorder("Text Options"));
+			GBC.reset(c);
+			GBC.setFill(c, GBC.GridFill.HORIZONTAL);
+			GBC.setWeights(c,0,0);
+			textPanel.add(new JLabel("Text: "      , SwingConstants.RIGHT),GBC.setGridPos(c,0,0));
+			textPanel.add(new JLabel("Size: "      , SwingConstants.RIGHT),GBC.setGridPos(c,0,1));
+			textPanel.add(new JLabel("X: "         , SwingConstants.RIGHT),GBC.setGridPos(c,0,2));
+			textPanel.add(new JLabel("Y: "         , SwingConstants.RIGHT),GBC.setGridPos(c,0,3));
+			textPanel.add(new JLabel("Line Width: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,4));
+			textPanel.add(new JLabel("Line Depth: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,5));
+			GBC.setWeights(c,1,0);
+//			textPanel.add(createTextInput  (text      , this::setText      ),GBC.setGridPos(c,1,0));
+//			textPanel.add(createDoubleInput(fontSize  , this::setFontSize  ),GBC.setGridPos(c,1,1));
+//			textPanel.add(createDoubleInput(textPosX  , this::setTextPosX  ),GBC.setGridPos(c,1,2));
+//			textPanel.add(createDoubleInput(textPosY  , this::setTextPosY  ),GBC.setGridPos(c,1,3));
+//			textPanel.add(createDoubleInput(lineWidth , this::setLineWidth ),GBC.setGridPos(c,1,4));
+//			textPanel.add(createDoubleInput(lineHeight, this::setLineHeight),GBC.setGridPos(c,1,5));
+			return textPanel;
+		}
+
+		private ProfileXY createProfile() {
+			return BumpMappingTest.createProfile(lineWidth, lineHeight);
+		}
+	}
+
+	private static ProfileXY createProfile(double lineWidth, double lineHeight) {
+		lineWidth  = Math.max(lineWidth , 0.01);
+		lineHeight = Math.max(lineHeight, 0.01);
+		
+		double x1 =  0 + lineWidth/6;
+		double x2 = x1 + lineWidth/6;
+		double x3 = x2 + lineWidth/6;
+		double xO = x3 + lineWidth/6;
+		
+		NormalXY vFace  = new NormalXY(0,1);
+		NormalXY vRamp = ProfileXY.Constant.computeNormal(x2,x3, 0,lineHeight);
+		
+		return new ProfileXY.Group(
+			new ProfileXY.Constant  ( 0, x1 ),
+			new ProfileXY.RoundBlend(x1, x2, vFace,vRamp),
+			new ProfileXY.Constant  (x2, x3, vRamp),
+			new ProfileXY.RoundBlend(x3, xO, vRamp,vFace)
+		);
+	}
+	
+	private class CartTextOverlay {
+
+		String text;
+		double textPosX;
+		double textPosY;
+		double fontSize_px;
+		double lineWidth;
+		double lineHeight;
+		AlphaCharSquence alphaCharSquence;
+		Centerer centerer;
+		
+		private CartTextOverlay(String text, double textPosX, double textPosY, double fontSize_px, double lineWidth, double lineHeight) {
+			this.text        = text      ;
+			this.textPosX    = textPosX  ;
+			this.textPosY    = textPosY  ;
+			this.fontSize_px = fontSize_px  ;
+			this.lineWidth   = lineWidth ;
+			this.lineHeight  = lineHeight;
+			ProfileXY profile = createProfile();
+			alphaCharSquence = new ExtraNormalFunction.Cart.AlphaCharSquence(this.textPosX, this.textPosY, this.fontSize_px/100, profile, this.text);
+			centerer = new ExtraNormalFunction.Centerer(alphaCharSquence);
+		}
+
+		public ExtraNormalFunction getExtraObj() {
+			return centerer;
 		}
 
 		public JPanel createOptionsPanel() {
@@ -496,7 +602,7 @@ public class BumpMappingTest {
 			textPanel.add(new JLabel("Line Depth: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,5));
 			GBC.setWeights(c,1,0);
 			textPanel.add(createTextInput  (text      , this::setText      ),GBC.setGridPos(c,1,0));
-			textPanel.add(createDoubleInput(fontSize  , this::setFontSize  ),GBC.setGridPos(c,1,1));
+			textPanel.add(createDoubleInput(fontSize_px  , this::setFontSize  ),GBC.setGridPos(c,1,1));
 			textPanel.add(createDoubleInput(textPosX  , this::setTextPosX  ),GBC.setGridPos(c,1,2));
 			textPanel.add(createDoubleInput(textPosY  , this::setTextPosY  ),GBC.setGridPos(c,1,3));
 			textPanel.add(createDoubleInput(lineWidth , this::setLineWidth ),GBC.setGridPos(c,1,4));
@@ -505,31 +611,14 @@ public class BumpMappingTest {
 		}
 
 		private ProfileXY createProfile() {
-			lineWidth  = Math.max(lineWidth , 0.01);
-			lineHeight = Math.max(lineHeight, 0.01);
-			
-			double x1 =  0 + lineWidth/6;
-			double x2 = x1 + lineWidth/6;
-			double x3 = x2 + lineWidth/6;
-			double xO = x3 + lineWidth/6;
-			
-			NormalXY vFace  = new NormalXY(0,1);
-			NormalXY vRamp = ProfileXY.Constant.computeNormal(x2,x3, 0,lineHeight);
-			
-			return new ProfileXY.Group(
-				new ProfileXY.Constant  ( 0, x1 ),
-				new ProfileXY.RoundBlend(x1, x2, vFace,vRamp),
-				new ProfileXY.Constant  (x2, x3, vRamp),
-				new ProfileXY.RoundBlend(x3, xO, vRamp,vFace)
-			);
+			return BumpMappingTest.createProfile(lineWidth, lineHeight);
 		}
 		
 		public void setText      (String text      ) { this.text       = text      ; alphaCharSquence.setText (text    );          bumpMapping.reset(); resultView.repaint(); }
 		public void setTextPosX  (double textPosX  ) { this.textPosX   = textPosX  ; alphaCharSquence.setX    (textPosX);          bumpMapping.reset(); resultView.repaint(); }
 		public void setTextPosY  (double textPosY  ) { this.textPosY   = textPosY  ; alphaCharSquence.setY    (textPosY);          bumpMapping.reset(); resultView.repaint(); }
-		public void setFontSize  (double fontSize  ) { this.fontSize   = fontSize  ; alphaCharSquence.setScale(fontSize);          bumpMapping.reset(); resultView.repaint(); }
+		public void setFontSize  (double fontSize  ) { this.fontSize_px   = fontSize  ; alphaCharSquence.setScale(fontSize);          bumpMapping.reset(); resultView.repaint(); }
 		public void setLineWidth (double lineWidth ) { this.lineWidth  = lineWidth ; alphaCharSquence.setProfile(createProfile()); bumpMapping.reset(); resultView.repaint(); }
-		@SuppressWarnings("unused")
 		public void setLineHeight(double lineHeight) { this.lineHeight = lineHeight; alphaCharSquence.setProfile(createProfile()); bumpMapping.reset(); resultView.repaint(); }
 	}
 	
