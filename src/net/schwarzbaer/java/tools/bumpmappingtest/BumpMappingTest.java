@@ -22,6 +22,8 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
 import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -31,6 +33,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
+import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -43,7 +46,12 @@ import net.schwarzbaer.gui.StandardMainWindow;
 import net.schwarzbaer.image.bumpmapping.BumpMapping;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Indexer;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
+import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.OverSampling;
+import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
+import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Cart.AlphaCharSquence;
+import net.schwarzbaer.image.bumpmapping.NormalFunction;
+import net.schwarzbaer.image.bumpmapping.ProfileXY;
 import net.schwarzbaer.image.bumpmapping.Shading;
 import net.schwarzbaer.image.bumpmapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.bumpmapping.Shading.MaterialShading;
@@ -69,13 +77,15 @@ public class BumpMappingTest {
 		System.out.printf(Locale.ENGLISH, "%s.rotateY(%1.1f°) -> %s%n", n, w_degree, n.rotateY(w_degree/180*Math.PI));
 	}
 
-	private Normal sun;
-	private BumpMapping bumpMapping;
-	private ResultView resultView;
-	private JPanel optionsPanel;
+	private Normal sun = null;
+	private BumpMapping bumpMapping = null;
+	private ResultView resultView = null;
+	private JPanel optionsPanel = null;
 	private JPanel currentValuePanel=null;
-	private StandardMainWindow mainwindow;
-
+	private StandardMainWindow mainwindow = null;
+	private TextOverlay textOverlay = null;
+	private ExtraNormalFunction.Centerer textOverlayCenterer = null;
+	
 	private void createGUI() {
 		GridBagConstraints c = new GridBagConstraints();
 		mainwindow = new StandardMainWindow("BumpMappingTest");
@@ -87,8 +97,7 @@ public class BumpMappingTest {
 		bumpMapping = new BumpMapping(true,true);
 		
 		resultView = new ResultView(bumpMapping);
-		resultView.setBorder(BorderFactory.createTitledBorder("Result"));
-		resultView.setPreferredSize(new Dimension(300,300));
+		resultView.setPreferredSize(new Dimension(450,350));
 		
 		JPanel buttonPanel = new JPanel(new GridLayout(1,0,3,3));
 		buttonPanel.add(createButton("Copy"   ,(JButton b)->copyImageToClipboard(b,1)));
@@ -97,8 +106,12 @@ public class BumpMappingTest {
 		buttonPanel.add(createButton("Copy 8x",(JButton b)->copyImageToClipboard(b,8)));
 		
 		JPanel resultViewPanel = new JPanel(new BorderLayout(3,3));
+		resultViewPanel.setBorder(BorderFactory.createTitledBorder("Result"));
 		resultViewPanel.add(resultView,BorderLayout.CENTER);
-		resultViewPanel.add(buttonPanel,BorderLayout.SOUTH);
+		
+		JPanel centerPanel = new JPanel(new BorderLayout(3,3));
+		centerPanel.add(resultViewPanel,BorderLayout.CENTER);
+		centerPanel.add(buttonPanel,BorderLayout.SOUTH);
 		
 		JTextField sunOutput = new JTextField(String.format(Locale.ENGLISH, "new Normal( %1.3f, %1.3f, %1.3f )", sun.x,sun.y,sun.z));
 		sunOutput.setEditable(false);
@@ -130,13 +143,19 @@ public class BumpMappingTest {
 		selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         this::setNormalFunction),GBC.setGridPos(c,1,1));
 		selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                this::setShading       ),GBC.setGridPos(c,1,2));
 		
+		textOverlay = new TextOverlay("MxXBabcd", -100, -50, 0.3, 5, 1);
+		textOverlayCenterer = new ExtraNormalFunction.Centerer(textOverlay.alphaCharSquence);
+		
+		JPanel textPanel = textOverlay.createOptionsPanel();
+		
 		optionsPanel = new JPanel(new BorderLayout(3,3));
 		optionsPanel.setBorder(BorderFactory.createTitledBorder("Options"));
 		optionsPanel.add(selectionPanel,BorderLayout.NORTH);
+		optionsPanel.add(textPanel,BorderLayout.SOUTH);
 		
 		for (Shadings sh:Shadings.values()) {
 			sh.valuePanel = new JPanel(new GridBagLayout());
-			sh.valuePanel.setBorder(BorderFactory.createTitledBorder("Shading Values"));
+			sh.valuePanel.setBorder(BorderFactory.createTitledBorder("Shading Options"));
 			GBC.reset(c);
 			switch(sh) {
 			case GUISurface: {
@@ -168,11 +187,11 @@ public class BumpMappingTest {
 				sh.valuePanel.add(new JLabel("With Reflection: "     ),GBC.setGridPos(c,0,3));
 				sh.valuePanel.add(new JLabel("Reflection Intensity: "),GBC.setGridPos(c,0,4));
 				GBC.setWeights(c,1,0);
-				sh.valuePanel.add(createColorbutton    (shading.getMaterialColor()   , "Select Material Color", shading::setMaterialColor),GBC.setGridPos(c,1,0));
-				sh.valuePanel.add(createDoubleTextField(shading.getAmbientIntensity(), shading::setAmbientIntensity),GBC.setGridPos(c,1,1));
-				sh.valuePanel.add(createDoubleTextField(shading.getPhongExp()        , shading::setPhongExp        ),GBC.setGridPos(c,1,2));
-				sh.valuePanel.add(createCheckBox       (shading.getReflection()      , shading::setReflection      ),GBC.setGridPos(c,1,3));
-				sh.valuePanel.add(createDoubleTextField(shading.getReflIntensity()   , shading::setReflIntensity   ),GBC.setGridPos(c,1,4));
+				sh.valuePanel.add(createColorbutton(shading.getMaterialColor()   , "Select Material Color", shading::setMaterialColor),GBC.setGridPos(c,1,0));
+				sh.valuePanel.add(createDoubleInput(shading.getAmbientIntensity(), shading::setAmbientIntensity),GBC.setGridPos(c,1,1));
+				sh.valuePanel.add(createDoubleInput(shading.getPhongExp()        , shading::setPhongExp        ),GBC.setGridPos(c,1,2));
+				sh.valuePanel.add(createCheckBox   (shading.getReflection()      , shading::setReflection      ),GBC.setGridPos(c,1,3));
+				sh.valuePanel.add(createDoubleInput(shading.getReflIntensity()   , shading::setReflIntensity   ),GBC.setGridPos(c,1,4));
 				GBC.setGridPos(c,0,5);
 				GBC.setLineEnd(c);
 				GBC.setWeights(c,1,1);
@@ -191,7 +210,7 @@ public class BumpMappingTest {
 		JPanel contentPane = new JPanel(new BorderLayout(3,3));
 		contentPane.setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
 		contentPane.add(optionsPanel,BorderLayout.WEST);
-		contentPane.add(resultViewPanel,BorderLayout.CENTER);
+		contentPane.add(centerPanel,BorderLayout.CENTER);
 		contentPane.add(rightPanel,BorderLayout.EAST);
 		
 		mainwindow.startGUI(contentPane);
@@ -276,37 +295,52 @@ public class BumpMappingTest {
 		return comp;
 	}
 	
-	private JTextField createDoubleTextField(double value, Consumer<Double> setValue) {
-		JTextField comp = new JTextField(Double.toString(value));
-		Consumer<Double> modifiedSetValue = d->{
+	private JTextField createDoubleInput(double value, Consumer<Double> setValue) {
+		Function<String,Double> parse = str->{ try { return Double.parseDouble(str); } catch (NumberFormatException e) { return Double.NaN; } };
+		Predicate<Double> isOK = v->v!=null && !Double.isNaN(v);
+		Function<Double, String> toString = v->v==null ? "" : v.toString();
+		return createGenericTextField(value, toString, parse, isOK, setValue);
+	}
+	
+	private JTextField createTextInput(String value, Consumer<String> setValue) {
+		return createGenericTextField(value, v->v, v->v, v->true, setValue, setValue);
+	}
+	
+	private <V> JTextField createGenericTextField(V value, Function<V,String> toString, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue) {
+		return createGenericTextField(value, toString, parse, isOK, setValue, null);
+	}
+	private <V> JTextField createGenericTextField(V value, Function<V,String> toString, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue, Consumer<V> setValueWhileAdjusting) {
+		JTextField comp = new JTextField(toString.apply(value));
+		Color defaultBG = comp.getBackground();
+		if (setValueWhileAdjusting!=null) {
+			comp.addCaretListener (e -> {
+				readTextField(comp,defaultBG,parse,isOK,v -> {
+					setValueWhileAdjusting.accept(v);
+					bumpMapping.reset();
+					resultView.repaint();
+				});
+			});
+		}
+		Consumer<V> modifiedSetValue = d -> {
 			setValue.accept(d);
 			bumpMapping.reset();
 			resultView.repaint();
 		};
-		Color defaultBG = comp.getBackground();
-		comp.addActionListener(e->{ readTextField(comp,modifiedSetValue,defaultBG); });
+		comp.addActionListener(e->{ readTextField(comp,defaultBG,parse,isOK,modifiedSetValue); });
 		comp.addFocusListener(new FocusListener() {
-			@Override public void focusLost(FocusEvent e) { readTextField(comp,modifiedSetValue,defaultBG); }
+			@Override public void focusLost  (FocusEvent e) { readTextField(comp,defaultBG,parse,isOK,modifiedSetValue); }
 			@Override public void focusGained(FocusEvent e) {}
 		});
 		return comp;
 	}
 
-	private void readTextField(JTextField comp, Consumer<Double> setValue, Color defaultBG) {
-		double d = parseDouble(comp.getText());
-		if (Double.isNaN(d)) {
-			comp.setBackground(Color.RED);
-		} else {
+	private <V> void readTextField(JTextField comp, Color defaultBG, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue) {
+		V d = parse.apply(comp.getText());
+		if (isOK.test(d)) {
 			comp.setBackground(defaultBG);
 			setValue.accept(d);
-		}
-	}
-
-	private double parseDouble(String str) {
-		try {
-			return Double.parseDouble(str);
-		} catch (NumberFormatException e) {
-			return Double.NaN;
+		} else {
+			comp.setBackground(Color.RED);
 		}
 	}
 
@@ -402,7 +436,12 @@ public class BumpMappingTest {
 	}
 
 	private void setNormalFunction(NormalFunctions nf) {
-		bumpMapping.setNormalFunction(nf.createNormalFunction.get());
+		NormalFunction normalFunction = nf.createNormalFunction.get();
+		if (normalFunction instanceof ExtraNormalFunction.Host) {
+			ExtraNormalFunction.Host cartHost = (ExtraNormalFunction.Host) normalFunction;
+			cartHost.setExtras(textOverlayCenterer);
+		}
+		bumpMapping.setNormalFunction(normalFunction);
 		resultView.repaint();
 	}
 
@@ -419,6 +458,79 @@ public class BumpMappingTest {
 			valueChanged.accept(i<0?null:comp.getItemAt(i));
 		});
 		return comp;
+	}
+	
+	private class TextOverlay {
+
+		public String text;
+		public double textPosX;
+		public double textPosY;
+		public double fontSize;
+		public double lineWidth;
+		public double lineHeight;
+		private AlphaCharSquence alphaCharSquence;
+		
+		private TextOverlay(String text, double textPosX, double textPosY, double fontSize, double lineWidth, double lineHeight) {
+			this.text       = text      ;
+			this.textPosX   = textPosX  ;
+			this.textPosY   = textPosY  ;
+			this.fontSize   = fontSize  ;
+			this.lineWidth  = lineWidth ;
+			this.lineHeight = lineHeight;
+			ProfileXY profile = createProfile();
+			alphaCharSquence = new ExtraNormalFunction.Cart.AlphaCharSquence(this.textPosX, this.textPosY, this.fontSize, profile, this.text);
+		}
+
+		public JPanel createOptionsPanel() {
+			GridBagConstraints c = new GridBagConstraints();
+			JPanel textPanel = new JPanel(new GridBagLayout());
+			textPanel.setBorder(BorderFactory.createTitledBorder("Text Options"));
+			GBC.reset(c);
+			GBC.setFill(c, GBC.GridFill.HORIZONTAL);
+			GBC.setWeights(c,0,0);
+			textPanel.add(new JLabel("Text: "      , SwingConstants.RIGHT),GBC.setGridPos(c,0,0));
+			textPanel.add(new JLabel("Size: "      , SwingConstants.RIGHT),GBC.setGridPos(c,0,1));
+			textPanel.add(new JLabel("X: "         , SwingConstants.RIGHT),GBC.setGridPos(c,0,2));
+			textPanel.add(new JLabel("Y: "         , SwingConstants.RIGHT),GBC.setGridPos(c,0,3));
+			textPanel.add(new JLabel("Line Width: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,4));
+			textPanel.add(new JLabel("Line Depth: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,5));
+			GBC.setWeights(c,1,0);
+			textPanel.add(createTextInput  (text      , this::setText      ),GBC.setGridPos(c,1,0));
+			textPanel.add(createDoubleInput(fontSize  , this::setFontSize  ),GBC.setGridPos(c,1,1));
+			textPanel.add(createDoubleInput(textPosX  , this::setTextPosX  ),GBC.setGridPos(c,1,2));
+			textPanel.add(createDoubleInput(textPosY  , this::setTextPosY  ),GBC.setGridPos(c,1,3));
+			textPanel.add(createDoubleInput(lineWidth , this::setLineWidth ),GBC.setGridPos(c,1,4));
+			textPanel.add(createDoubleInput(lineHeight, this::setLineHeight),GBC.setGridPos(c,1,5));
+			return textPanel;
+		}
+
+		private ProfileXY createProfile() {
+			lineWidth  = Math.max(lineWidth , 0.01);
+			lineHeight = Math.max(lineHeight, 0.01);
+			
+			double x1 =  0 + lineWidth/6;
+			double x2 = x1 + lineWidth/6;
+			double x3 = x2 + lineWidth/6;
+			double xO = x3 + lineWidth/6;
+			
+			NormalXY vFace  = new NormalXY(0,1);
+			NormalXY vRamp = ProfileXY.Constant.computeNormal(x2,x3, 0,lineHeight);
+			
+			return new ProfileXY.Group(
+				new ProfileXY.Constant  ( 0, x1 ),
+				new ProfileXY.RoundBlend(x1, x2, vFace,vRamp),
+				new ProfileXY.Constant  (x2, x3, vRamp),
+				new ProfileXY.RoundBlend(x3, xO, vRamp,vFace)
+			);
+		}
+		
+		public void setText      (String text      ) { this.text       = text      ; alphaCharSquence.setText (text    );          bumpMapping.reset(); resultView.repaint(); }
+		public void setTextPosX  (double textPosX  ) { this.textPosX   = textPosX  ; alphaCharSquence.setX    (textPosX);          bumpMapping.reset(); resultView.repaint(); }
+		public void setTextPosY  (double textPosY  ) { this.textPosY   = textPosY  ; alphaCharSquence.setY    (textPosY);          bumpMapping.reset(); resultView.repaint(); }
+		public void setFontSize  (double fontSize  ) { this.fontSize   = fontSize  ; alphaCharSquence.setScale(fontSize);          bumpMapping.reset(); resultView.repaint(); }
+		public void setLineWidth (double lineWidth ) { this.lineWidth  = lineWidth ; alphaCharSquence.setProfile(createProfile()); bumpMapping.reset(); resultView.repaint(); }
+		@SuppressWarnings("unused")
+		public void setLineHeight(double lineHeight) { this.lineHeight = lineHeight; alphaCharSquence.setProfile(createProfile()); bumpMapping.reset(); resultView.repaint(); }
 	}
 	
 	private enum Shadings {
