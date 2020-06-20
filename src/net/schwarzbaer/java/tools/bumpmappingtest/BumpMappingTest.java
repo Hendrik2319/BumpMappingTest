@@ -83,17 +83,21 @@ public class BumpMappingTest {
 		System.out.printf(Locale.ENGLISH, "%s.rotateY(%1.1f°) -> %s%n", n, w_degree, n.rotateY(w_degree/180*Math.PI));
 	}
 	
-	enum ValueGroup implements MainWindowSettings.GroupKeys<ValueKey> {
-		WindowPos (ValueKey.WindowX, ValueKey.WindowY),
-		WindowSize(ValueKey.WindowWidth, ValueKey.WindowHeight);
-		ValueKey[] keys;
-		ValueGroup(ValueKey...keys) { this.keys = keys;}
-		@Override public ValueKey[] getKeys() { return keys; }
-	}
-	
-	enum ValueKey { WindowX, WindowY, WindowWidth, WindowHeight }
-	
-	private class MainWindowSettings extends Settings<ValueGroup,ValueKey> {
+	private static class MainWindowSettings extends Settings<MainWindowSettings.ValueGroup,MainWindowSettings.ValueKey> {
+		
+		enum ValueGroup implements Settings.GroupKeys<ValueKey> {
+			WindowPos (ValueKey.WindowX, ValueKey.WindowY),
+			WindowSize(ValueKey.WindowWidth, ValueKey.WindowHeight);
+			ValueKey[] keys;
+			ValueGroup(ValueKey...keys) { this.keys = keys;}
+			@Override public ValueKey[] getKeys() { return keys; }
+		}
+		
+		enum ValueKey {
+			WindowX, WindowY, WindowWidth, WindowHeight,
+			Polar_Text,Polar_Radius,Polar_RadiusOffset,Polar_Angle,Polar_FontSize,Polar_LineWidth,Polar_LineHeight,
+			Cart_Text,Cart_TextPosX,Cart_TextPosY,Cart_FontSize,Cart_LineWidth,Cart_LineHeight
+		}
 
 		public MainWindowSettings() { super(BumpMappingTest.class); }
 
@@ -202,8 +206,8 @@ public class BumpMappingTest {
 			selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                BumpMappingTest.this::setShading       ),GBC.setGridPos(c,1,2));
 			
 			
-			cartTextOverlay  = new CartTextOverlay (this,"MxXBabcd", -100, -50, 30, 5, 1);
-			polarTextOverlay = new PolarTextOverlay(this,"MxXBabcd", 100, 15, -90, 30, 5, 1);
+			cartTextOverlay  = new CartTextOverlay (this,settings,"MxXBabcd", -100, -50, 30, 5, 1);
+			polarTextOverlay = new PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1);
 			cartTextOptionPanel  = cartTextOverlay.createOptionsPanel();
 			polarTextOptionPanel = polarTextOverlay.createOptionsPanel();
 			dummyTextOptionPanel = new JPanel(new GridBagLayout());
@@ -276,8 +280,8 @@ public class BumpMappingTest {
 			
 			mainwindow.startGUI(contentPane);
 			
-			if (settings.isSet(ValueGroup.WindowPos )) mainwindow.setLocation(settings.getWindowPos ());
-			if (settings.isSet(ValueGroup.WindowSize)) mainwindow.setSize    (settings.getWindowSize());
+			if (settings.isSet(MainWindowSettings.ValueGroup.WindowPos )) mainwindow.setLocation(settings.getWindowPos ());
+			if (settings.isSet(MainWindowSettings.ValueGroup.WindowSize)) mainwindow.setSize    (settings.getWindowSize());
 			
 			mainwindow.addComponentListener(new ComponentListener() {
 				@Override public void componentShown  (ComponentEvent e) {}
@@ -580,7 +584,7 @@ public class BumpMappingTest {
 		);
 	}
 
-	private static abstract class AbstractTextOverlay<ExtraObjType extends ExtraNormalFunction, ValueGroup_ extends Enum<ValueGroup_> & Settings.GroupKeys<ValueKey_>, ValueKey_ extends Enum<ValueKey_>> {
+	private static abstract class AbstractTextOverlay<ExtraObjType extends ExtraNormalFunction> {
 		/*
 		enum ValueGroup implements Settings.GroupKeys<ValueKey> {
 			;
@@ -589,26 +593,22 @@ public class BumpMappingTest {
 			@Override public ValueKey[] getKeys() { return keys; }
 		}
 		*/
-
-		private class TextOverlaySettings extends Settings<ValueGroup_,ValueKey_> {
-			public TextOverlaySettings(Class<?> thisClass) { super(thisClass); }
-		}
 		
 		protected GUI gui;
-		protected TextOverlaySettings settings;
+		private MainWindowSettings settings;
 		
-		protected AbstractTextOverlay(GUI gui, Class<?> thisClass) {
+		protected AbstractTextOverlay(GUI gui, MainWindowSettings settings) {
 			this.gui = gui;
-			settings = new TextOverlaySettings(thisClass);
+			this.settings = settings;
 		}
 		
 		public abstract ExtraObjType getExtraObj();
 		public abstract JPanel createOptionsPanel();
 		
-		protected double setDoubleValue(double oldValue, double newValue, ValueKey_ valueKey, Runnable setValue) {
+		protected double setDoubleValue(double oldValue, double newValue, MainWindowSettings.ValueKey valueKey, Runnable setValue) {
 			return setValue(oldValue, newValue, ()->{ settings.putDouble(valueKey, newValue); setValue.run(); });
 		}
-		protected String setStringValue(String oldValue, String newValue, ValueKey_ valueKey, Runnable setValue) {
+		protected String setStringValue(String oldValue, String newValue, MainWindowSettings.ValueKey valueKey, Runnable setValue) {
 			return setValue(oldValue, newValue, ()->{ settings.putString(valueKey, newValue); setValue.run(); });
 		}
 		private <V> V setValue(V oldValue, V newValue, Runnable setValue) {
@@ -619,12 +619,7 @@ public class BumpMappingTest {
 		}
 	}
 
-	private static class PolarTextOverlay extends AbstractTextOverlay<ExtraNormalFunction.Polar, PolarTextOverlay.ValueGroup, PolarTextOverlay.ValueKey> {
-
-		enum ValueKey { Text,Radius,RadiusOffset,Angle,FontSize,LineWidth,LineHeight }
-		enum ValueGroup implements Settings.GroupKeys<ValueKey> {
-			; @Override public ValueKey[] getKeys() { return null; }
-		}
+	private static class PolarTextOverlay extends AbstractTextOverlay<ExtraNormalFunction.Polar> {
 		
 		private static final double DEG2RAD = 1/180.0*Math.PI;
 		private String text;
@@ -637,15 +632,15 @@ public class BumpMappingTest {
 		private final AlphaCharSquence alphaCharSquence;
 		private final BentCartExtra bender;
 
-		public PolarTextOverlay(GUI gui, String text, double radius_px, double radiusOffset_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px) {
-			super(gui,PolarTextOverlay.class);
-			this.text            = settings.getString(ValueKey.Text        , text           );
-			this.radius_px       = settings.getDouble(ValueKey.Radius      , radius_px      );
-			this.radiusOffset_px = settings.getDouble(ValueKey.RadiusOffset, radiusOffset_px);
-			this.angle_deg       = settings.getDouble(ValueKey.Angle       , angle_deg      );
-			this.fontSize_px     = settings.getDouble(ValueKey.FontSize    , fontSize_px    );
-			this.lineWidth_px    = settings.getDouble(ValueKey.LineWidth   , lineWidth_px   );
-			this.lineHeight_px   = settings.getDouble(ValueKey.LineHeight  , lineHeight_px  );
+		public PolarTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px) {
+			super(gui,settings);
+			this.text            = settings.getString(MainWindowSettings.ValueKey.Polar_Text        , text           );
+			this.radius_px       = settings.getDouble(MainWindowSettings.ValueKey.Polar_Radius      , radius_px      );
+			this.radiusOffset_px = settings.getDouble(MainWindowSettings.ValueKey.Polar_RadiusOffset, radiusOffset_px);
+			this.angle_deg       = settings.getDouble(MainWindowSettings.ValueKey.Polar_Angle       , angle_deg      );
+			this.fontSize_px     = settings.getDouble(MainWindowSettings.ValueKey.Polar_FontSize    , fontSize_px    );
+			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineWidth   , lineWidth_px   );
+			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineHeight  , lineHeight_px  );
 			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
 			alphaCharSquence = new AlphaCharSquence(0,-this.radiusOffset_px, this.fontSize_px/100, profile, this.text);
 			bender = new BentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, alphaCharSquence);
@@ -682,21 +677,16 @@ public class BumpMappingTest {
 			return textPanel;
 		}
 		
-		private void setText        (String text           ) { this.text            = setStringValue( this.text           , text           , ValueKey.Text        , ()->alphaCharSquence.setText   ( text                                    ) ); }
-		private void setRadius      (double radius_px      ) { this.radius_px       = setDoubleValue( this.radius_px      , radius_px      , ValueKey.Radius      , ()->bender      .setZeroYRadius( radius_px                               ) ); }
-		private void setRadiusOffset(double radiusOffset_px) { this.radiusOffset_px = setDoubleValue( this.radiusOffset_px, radiusOffset_px, ValueKey.RadiusOffset, ()->alphaCharSquence.setY      (-radiusOffset_px                         ) ); }
-		private void setAngle       (double angle_deg      ) { this.angle_deg       = setDoubleValue( this.angle_deg      , angle_deg      , ValueKey.Angle       , ()->bender      .setZeroXAngle ( angle_deg*DEG2RAD                       ) ); }
-		private void setFontSize    (double fontSize_px    ) { this.fontSize_px     = setDoubleValue( this.fontSize_px    , fontSize_px    , ValueKey.FontSize    , ()->alphaCharSquence.setScale  ( fontSize_px/100                         ) ); }
-		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , ValueKey.LineWidth   , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
-		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , ValueKey.LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
+		private void setText        (String text           ) { this.text            = setStringValue( this.text           , text           , MainWindowSettings.ValueKey.Polar_Text        , ()->alphaCharSquence.setText   ( text                                    ) ); }
+		private void setRadius      (double radius_px      ) { this.radius_px       = setDoubleValue( this.radius_px      , radius_px      , MainWindowSettings.ValueKey.Polar_Radius      , ()->bender      .setZeroYRadius( radius_px                               ) ); }
+		private void setRadiusOffset(double radiusOffset_px) { this.radiusOffset_px = setDoubleValue( this.radiusOffset_px, radiusOffset_px, MainWindowSettings.ValueKey.Polar_RadiusOffset, ()->alphaCharSquence.setY      (-radiusOffset_px                         ) ); }
+		private void setAngle       (double angle_deg      ) { this.angle_deg       = setDoubleValue( this.angle_deg      , angle_deg      , MainWindowSettings.ValueKey.Polar_Angle       , ()->bender      .setZeroXAngle ( angle_deg*DEG2RAD                       ) ); }
+		private void setFontSize    (double fontSize_px    ) { this.fontSize_px     = setDoubleValue( this.fontSize_px    , fontSize_px    , MainWindowSettings.ValueKey.Polar_FontSize    , ()->alphaCharSquence.setScale  ( fontSize_px/100                         ) ); }
+		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , MainWindowSettings.ValueKey.Polar_LineWidth   , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
+		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , MainWindowSettings.ValueKey.Polar_LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
 	}
 
-	private static class CartTextOverlay extends AbstractTextOverlay<ExtraNormalFunction, CartTextOverlay.ValueGroup, CartTextOverlay.ValueKey> {
-		
-		enum ValueKey { Text,TextPosX,TextPosY,FontSize,LineWidth,LineHeight }
-		enum ValueGroup implements Settings.GroupKeys<ValueKey> {
-			; @Override public ValueKey[] getKeys() { return null; }
-		}
+	private static class CartTextOverlay extends AbstractTextOverlay<ExtraNormalFunction> {
 		
 		private String text;
 		private double textPosX_px;
@@ -707,14 +697,14 @@ public class BumpMappingTest {
 		private final AlphaCharSquence alphaCharSquence;
 		private final Centerer centerer;
 		
-		CartTextOverlay(GUI gui, String text, double textPosX_px, double textPosY_px, double fontSize_px, double lineWidth_px, double lineHeight_px) {
-			super(gui,CartTextOverlay.class);
-			this.text           = settings.getString(ValueKey.Text      , text         );
-			this.textPosX_px    = settings.getDouble(ValueKey.TextPosX  , textPosX_px  );
-			this.textPosY_px    = settings.getDouble(ValueKey.TextPosY  , textPosY_px  );
-			this.fontSize_px    = settings.getDouble(ValueKey.FontSize  , fontSize_px  );
-			this.lineWidth_px   = settings.getDouble(ValueKey.LineWidth , lineWidth_px );
-			this.lineHeight_px  = settings.getDouble(ValueKey.LineHeight, lineHeight_px);
+		CartTextOverlay(GUI gui, MainWindowSettings settings, String text, double textPosX_px, double textPosY_px, double fontSize_px, double lineWidth_px, double lineHeight_px) {
+			super(gui,settings);
+			this.text           = settings.getString(MainWindowSettings.ValueKey.Cart_Text      , text         );
+			this.textPosX_px    = settings.getDouble(MainWindowSettings.ValueKey.Cart_TextPosX  , textPosX_px  );
+			this.textPosY_px    = settings.getDouble(MainWindowSettings.ValueKey.Cart_TextPosY  , textPosY_px  );
+			this.fontSize_px    = settings.getDouble(MainWindowSettings.ValueKey.Cart_FontSize  , fontSize_px  );
+			this.lineWidth_px   = settings.getDouble(MainWindowSettings.ValueKey.Cart_LineWidth , lineWidth_px );
+			this.lineHeight_px  = settings.getDouble(MainWindowSettings.ValueKey.Cart_LineHeight, lineHeight_px);
 			ProfileXY profile = createProfile(this.lineWidth_px, this.lineHeight_px);
 			alphaCharSquence = new AlphaCharSquence(this.textPosX_px, this.textPosY_px, this.fontSize_px/100, profile, this.text);
 			centerer = new Centerer(alphaCharSquence);
@@ -749,12 +739,12 @@ public class BumpMappingTest {
 			return textPanel;
 		}
 
-		private void setText      (String text         ) { this.text          = setStringValue( this.text         , text         , ValueKey.Text      , ()->alphaCharSquence.setText   (text                                      ) ); }
-		private void setTextPosX  (double textPosX_px  ) { this.textPosX_px   = setDoubleValue( this.textPosX_px  , textPosX_px  , ValueKey.TextPosX  , ()->alphaCharSquence.setX      (textPosX_px                               ) ); }
-		private void setTextPosY  (double textPosY_px  ) { this.textPosY_px   = setDoubleValue( this.textPosY_px  , textPosY_px  , ValueKey.TextPosY  , ()->alphaCharSquence.setY      (textPosY_px                               ) ); }
-		private void setFontSize  (double fontSize_px  ) { this.fontSize_px   = setDoubleValue( this.fontSize_px  , fontSize_px  , ValueKey.FontSize  , ()->alphaCharSquence.setScale  (fontSize_px/100                           ) ); }
-		private void setLineWidth (double lineWidth_px ) { this.lineWidth_px  = setDoubleValue( this.lineWidth_px , lineWidth_px , ValueKey.LineWidth , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px, lineHeight_px)) ); }
-		private void setLineHeight(double lineHeight_px) { this.lineHeight_px = setDoubleValue( this.lineHeight_px, lineHeight_px, ValueKey.LineHeight, ()->alphaCharSquence.setProfile(createProfile(lineWidth_px, lineHeight_px)) ); }
+		private void setText      (String text         ) { this.text          = setStringValue( this.text         , text         , MainWindowSettings.ValueKey.Cart_Text      , ()->alphaCharSquence.setText   (text                                      ) ); }
+		private void setTextPosX  (double textPosX_px  ) { this.textPosX_px   = setDoubleValue( this.textPosX_px  , textPosX_px  , MainWindowSettings.ValueKey.Cart_TextPosX  , ()->alphaCharSquence.setX      (textPosX_px                               ) ); }
+		private void setTextPosY  (double textPosY_px  ) { this.textPosY_px   = setDoubleValue( this.textPosY_px  , textPosY_px  , MainWindowSettings.ValueKey.Cart_TextPosY  , ()->alphaCharSquence.setY      (textPosY_px                               ) ); }
+		private void setFontSize  (double fontSize_px  ) { this.fontSize_px   = setDoubleValue( this.fontSize_px  , fontSize_px  , MainWindowSettings.ValueKey.Cart_FontSize  , ()->alphaCharSquence.setScale  (fontSize_px/100                           ) ); }
+		private void setLineWidth (double lineWidth_px ) { this.lineWidth_px  = setDoubleValue( this.lineWidth_px , lineWidth_px , MainWindowSettings.ValueKey.Cart_LineWidth , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px, lineHeight_px)) ); }
+		private void setLineHeight(double lineHeight_px) { this.lineHeight_px = setDoubleValue( this.lineHeight_px, lineHeight_px, MainWindowSettings.ValueKey.Cart_LineHeight, ()->alphaCharSquence.setProfile(createProfile(lineWidth_px, lineHeight_px)) ); }
 	}
 	
 	private enum Shadings {
