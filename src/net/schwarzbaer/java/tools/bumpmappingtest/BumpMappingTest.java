@@ -506,6 +506,7 @@ public class BumpMappingTest {
 			ProfileXY profile = createProfile();
 			alphaCharSquence = new ExtraNormalFunction.Cart.AlphaCharSquence(0,0, this.fontSize_px/100, profile, this.text);
 			bender = new ExtraNormalFunction.Polar.BentCartExtra(this.radius_px, this.angle_deg/180*Math.PI, alphaCharSquence);
+			// TODO: R offset 
 		}
 
 		public Polar getExtraObj() {
@@ -526,6 +527,7 @@ public class BumpMappingTest {
 			textPanel.add(new JLabel("Line Width: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,4));
 			textPanel.add(new JLabel("Line Depth: ", SwingConstants.RIGHT),GBC.setGridPos(c,0,5));
 			GBC.setWeights(c,1,0);
+			// TODO
 //			textPanel.add(createTextInput  (text      , this::setText      ),GBC.setGridPos(c,1,0));
 //			textPanel.add(createDoubleInput(fontSize  , this::setFontSize  ),GBC.setGridPos(c,1,1));
 //			textPanel.add(createDoubleInput(textPosX  , this::setTextPosX  ),GBC.setGridPos(c,1,2));
