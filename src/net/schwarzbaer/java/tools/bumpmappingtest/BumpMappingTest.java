@@ -9,19 +9,13 @@ import java.awt.GridBagLayout;
 import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Point;
-import java.awt.Toolkit;
 import java.awt.Window;
-import java.awt.datatransfer.Clipboard;
-import java.awt.datatransfer.DataFlavor;
-import java.awt.datatransfer.Transferable;
-import java.awt.datatransfer.UnsupportedFlavorException;
 import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.image.BufferedImage;
-import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.util.Locale;
 import java.util.function.Consumer;
@@ -62,6 +56,7 @@ import net.schwarzbaer.image.bumpmapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.image.bumpmapping.Shading.MaterialShading;
 import net.schwarzbaer.image.bumpmapping.Shading.MixedShading;
 import net.schwarzbaer.image.bumpmapping.Shading.NormalImage;
+import net.schwarzbaer.system.ClipboardTools;
 import net.schwarzbaer.system.Settings;
 
 public class BumpMappingTest {
@@ -498,34 +493,13 @@ public class BumpMappingTest {
 					pd.setIndeterminate(true);
 				});
 				
-				Toolkit toolkit = Toolkit.getDefaultToolkit();
-				Clipboard clipboard = toolkit.getSystemClipboard();
-				TransferableImage content = new TransferableImage(image);
-				//DataHandler content = new DataHandler(image,"image/x-java-image");
-				
-				try { clipboard.setContents(content,null); }
-				catch (IllegalStateException e1) { e1.printStackTrace(); }
+				ClipboardTools.copyToClipBoard(image);
 				
 				processInEventThread(()->comp.setEnabled(true));
 			});
 			
 			
 		}).start();
-	}
-	
-	private static class TransferableImage implements Transferable {
-
-		private BufferedImage image;
-		public TransferableImage(BufferedImage image) { this.image = image; }
-
-		@Override public Object getTransferData(DataFlavor flavor) throws UnsupportedFlavorException, IOException {
-			if (isDataFlavorSupported(flavor)) return image;
-			throw new UnsupportedFlavorException( flavor );
-		}
-
-		@Override public DataFlavor[] getTransferDataFlavors() { return new DataFlavor[] { DataFlavor.imageFlavor }; }
-		@Override public boolean isDataFlavorSupported(DataFlavor flavor) { return DataFlavor.imageFlavor.equals(flavor); }
-		
 	}
 	
 	private void setShading(Shadings sh) {
