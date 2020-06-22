@@ -17,6 +17,7 @@ import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.InvocationTargetException;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -40,6 +41,8 @@ import net.schwarzbaer.gui.Canvas;
 import net.schwarzbaer.gui.HSColorChooser;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
+import net.schwarzbaer.image.alphachar.AlphaCharIO;
+import net.schwarzbaer.image.alphachar.Form;
 import net.schwarzbaer.image.bumpmapping.BumpMapping;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Indexer;
 import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
@@ -61,14 +64,15 @@ import net.schwarzbaer.system.Settings;
 
 public class BumpMappingTest {
 
+	private static HashMap<Character, Form[]> font;
+
 	public static void main(String[] args) {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
+		
+		font = AlphaCharIO.readDefaultAlphaCharFont();
+		
 		new BumpMappingTest().createGUI();
-		
-		//testRotZ(2,1,0,90);
-		//testRotZ(2,0,1,90);
-		
 	}
 
 	@SuppressWarnings("unused")
@@ -616,7 +620,7 @@ public class BumpMappingTest {
 			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineWidth   , lineWidth_px   );
 			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineHeight  , lineHeight_px  );
 			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
-			alphaCharSquence = new AlphaCharSquence(0,-this.radiusOffset_px, this.fontSize_px/100, profile, this.text);
+			alphaCharSquence = new AlphaCharSquence(0,-this.radiusOffset_px, this.fontSize_px/100, profile, this.text, font);
 			bender = new BentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, alphaCharSquence);
 		}
 
@@ -680,7 +684,7 @@ public class BumpMappingTest {
 			this.lineWidth_px   = settings.getDouble(MainWindowSettings.ValueKey.Cart_LineWidth , lineWidth_px );
 			this.lineHeight_px  = settings.getDouble(MainWindowSettings.ValueKey.Cart_LineHeight, lineHeight_px);
 			ProfileXY profile = createProfile(this.lineWidth_px, this.lineHeight_px);
-			alphaCharSquence = new AlphaCharSquence(this.textPosX_px, this.textPosY_px, this.fontSize_px/100, profile, this.text);
+			alphaCharSquence = new AlphaCharSquence(this.textPosX_px, this.textPosY_px, this.fontSize_px/100, profile, this.text, font);
 			centerer = new Centerer(alphaCharSquence);
 		}
 
