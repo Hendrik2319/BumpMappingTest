@@ -70,7 +70,7 @@ public class BumpMappingTest {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
 		
-		font = AlphaCharIO.readDefaultAlphaCharFont();
+		font = AlphaCharIO.readDefaultAlphaCharFont(null);
 		
 		new BumpMappingTest().createGUI();
 	}
