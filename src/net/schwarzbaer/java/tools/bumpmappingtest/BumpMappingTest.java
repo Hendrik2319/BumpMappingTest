@@ -10,12 +10,12 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Window;
-import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.FocusEvent;
 import java.awt.event.FocusListener;
 import java.awt.image.BufferedImage;
+import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Locale;
@@ -30,6 +30,7 @@ import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JTextField;
 import javax.swing.SwingConstants;
@@ -41,6 +42,7 @@ import javax.swing.event.CaretListener;
 
 import net.schwarzbaer.gui.BumpmappingSunControl;
 import net.schwarzbaer.gui.Canvas;
+import net.schwarzbaer.gui.FileChooser;
 import net.schwarzbaer.gui.HSColorChooser;
 import net.schwarzbaer.gui.ProgressDialog;
 import net.schwarzbaer.gui.StandardMainWindow;
@@ -129,9 +131,9 @@ public class BumpMappingTest {
 
 	private Normal sun;
 	private BumpMapping bumpMapping;
-	private CartTextOverlay  cartTextOverlay = null;
-	private TextOverlaySwitcher<ExtraNormalFunction.Polar> polarTextOverlaySwitcher;
 	private MainWindowSettings settings;
+	private CartTextOverlay  cartTextOverlay = null;
+	private TextOverlaySwitcher<ExtraNormalFunction.Polar> polarTextOverlaySwitcher = null;
 	private GUI gui = null;
 	
 	private BumpMappingTest() {
@@ -142,23 +144,28 @@ public class BumpMappingTest {
 	
 	private void createGUI() {
 		gui = new GUI();
-		gui.create();
+		gui.init();
 	}
 	
 	private class GUI {
-		private StandardMainWindow mainwindow = null;
-		private ResultView resultView = null;
-		private JPanel optionsPanel = null;
-		private JPanel currentShadingOptionsPanel=null;
+		private final StandardMainWindow mainwindow;
+		private final ResultView resultView;
+		private final JPanel optionsPanel;
+		private JPanel currentShadingOptionsPanel = null;
 		private JPanel currentTextOptionPanel = null;
-		private JPanel cartTextOptionPanel = null;
-		private JPanel polarTextOverlaySwitcherPanel = null;
-		private JPanel dummyTextOptionPanel = null;
+		private final JPanel cartTextOptionPanel;
+		private final JPanel polarTextOverlaySwitcherPanel;
+		private final JPanel dummyTextOptionPanel;
+		private final JTextField fontField;
+		private final FileChooser fontFileChooser;
+		private Runnable init;
 	
-		private void create() {
+		GUI() {
 			GridBagConstraints c = new GridBagConstraints();
 			mainwindow = new StandardMainWindow("BumpMappingTest");
 			settings = new MainWindowSettings();
+			
+			fontFileChooser = new FileChooser("Font-File", AlphaCharIO.ALPHACHARFONT_EXTENSION);
 			
 			NormalFunctions initialNormalFunction = settings.getEnum(MainWindowSettings.ValueKey.NormalFunction, NormalFunctions.HemiSphereBubblesT, NormalFunctions.class);
 			Shadings        initialShading        = settings.getEnum(MainWindowSettings.ValueKey.Shading       , Shadings.Material                 , Shadings       .class);
@@ -197,18 +204,27 @@ public class BumpMappingTest {
 			rightPanel.add(directionControl,BorderLayout.CENTER);
 			rightPanel.add(sunOutput,BorderLayout.NORTH);
 			
+			int i;
 			GBC.reset(c);
 			GBC.setFill(c, GBC.GridFill.BOTH);
 			JPanel selectionPanel = new JPanel(new GridBagLayout());
-			GBC.setWeights(c,0,1);
 			
-			selectionPanel.add(new JLabel("OverSampling: "  ),GBC.setGridPos(c,0,0));
-			selectionPanel.add(new JLabel("NormalFunction: "),GBC.setGridPos(c,0,1));
-			selectionPanel.add(new JLabel("Shading: "       ),GBC.setGridPos(c,0,2));
-			GBC.setWeights(c,1,1);
-			selectionPanel.add(createComboBox(OverSampling   .values(), bumpMapping.getOverSampling(), BumpMappingTest.this::setOverSampling  ),GBC.setGridPos(c,1,0));
-			selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         BumpMappingTest.this::setNormalFunction),GBC.setGridPos(c,1,1));
-			selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                BumpMappingTest.this::setShading       ),GBC.setGridPos(c,1,2));
+			GBC.setWeights(c,0,0); i=0;
+			selectionPanel.add(new JLabel("OverSampling: "  ),GBC.setGridPos(c,0,i++));
+			selectionPanel.add(new JLabel("NormalFunction: "),GBC.setGridPos(c,0,i++));
+			selectionPanel.add(new JLabel("Shading: "       ),GBC.setGridPos(c,0,i++));
+			selectionPanel.add(new JLabel("Font: "          ),GBC.setGridPos(c,0,i++));
+			
+			GBC.setGridWidth(c,2);
+			GBC.setWeights(c,1,0); i=0;
+			selectionPanel.add(createComboBox(OverSampling   .values(), bumpMapping.getOverSampling(), BumpMappingTest.this::setOverSampling  ),GBC.setGridPos(c,1,i++));
+			selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         BumpMappingTest.this::setNormalFunction),GBC.setGridPos(c,1,i++));
+			selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                BumpMappingTest.this::setShading       ),GBC.setGridPos(c,1,i++));
+			
+			fontField = new JTextField("",5);
+			fontField.setEditable(false);
+			GBC.setGridWidth(c,1); selectionPanel.add(fontField,GBC.setGridPos(c,1,i));
+			GBC.setWeights(c,0,0); selectionPanel.add(createButton("...", b->loadFont()),GBC.setGridPos(c,2,i));
 			
 			polarTextOverlaySwitcher = new TextOverlaySwitcher<ExtraNormalFunction.Polar>(this,settings,MainWindowSettings.ValueKey.SelectedPolarTextOverlay);
 			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
@@ -276,8 +292,9 @@ public class BumpMappingTest {
 				}
 			}
 			
-			setNormalFunction(initialNormalFunction);
-			setShading(initialShading);
+//			bumpMapping.setNormalFunction(initialNormalFunction.createNormalFunction.get());
+//			bumpMapping.setShading(initialShading.shading);
+//			bumpMapping.setSun(sun.x,sun.y,sun.z);
 			
 			JPanel contentPane = new JPanel(new BorderLayout(3,3));
 			contentPane.setBorder(BorderFactory.createEmptyBorder(3,3,3,3));
@@ -285,17 +302,61 @@ public class BumpMappingTest {
 			contentPane.add(centerPanel,BorderLayout.CENTER);
 			contentPane.add(rightPanel,BorderLayout.EAST);
 			
-			mainwindow.startGUI(contentPane);
+			init = ()->{
+				setNormalFunction(initialNormalFunction);
+				setShading(initialShading);
+				
+				mainwindow.startGUI(contentPane);
+				
+				if (settings.isSet(MainWindowSettings.ValueGroup.WindowPos )) mainwindow.setLocation(settings.getWindowPos ());
+				if (settings.isSet(MainWindowSettings.ValueGroup.WindowSize)) mainwindow.setSize    (settings.getWindowSize());
+				
+				mainwindow.addComponentListener(new ComponentListener() {
+					@Override public void componentShown  (ComponentEvent e) {}
+					@Override public void componentHidden (ComponentEvent e) {}
+					@Override public void componentResized(ComponentEvent e) { settings.setWindowSize( mainwindow.getSize() ); }
+					@Override public void componentMoved  (ComponentEvent e) { settings.setWindowPos ( mainwindow.getLocation() ); }
+				});
+			};
 			
-			if (settings.isSet(MainWindowSettings.ValueGroup.WindowPos )) mainwindow.setLocation(settings.getWindowPos ());
-			if (settings.isSet(MainWindowSettings.ValueGroup.WindowSize)) mainwindow.setSize    (settings.getWindowSize());
+		}
+		
+		void init() { init.run(); init=null; }
+
+		private void loadFont() {
 			
-			mainwindow.addComponentListener(new ComponentListener() {
-				@Override public void componentShown  (ComponentEvent e) {}
-				@Override public void componentHidden (ComponentEvent e) {}
-				@Override public void componentResized(ComponentEvent e) { settings.setWindowSize( mainwindow.getSize() ); }
-				@Override public void componentMoved  (ComponentEvent e) { settings.setWindowPos ( mainwindow.getLocation() ); }
-			});
+			String title = "Load Default Font?";
+			String message = "Do you want to load the default font?";
+			int result = JOptionPane.showConfirmDialog(mainwindow, message, title, JOptionPane.YES_NO_CANCEL_OPTION);
+			
+			switch (result) {
+			
+			case JOptionPane.YES_OPTION:
+				loadDefaultFont();
+				break;
+				
+			case JOptionPane.NO_OPTION:
+				if (fontFileChooser.showOpenDialog(mainwindow) == FileChooser.APPROVE_OPTION)
+					loadFont(fontFileChooser.getSelectedFile());
+				break;
+				
+			}
+		}
+
+		private void loadFont(File file) {
+			font = AlphaCharIO.readAlphaCharFontFromFile(file, null, true);
+			fontField.setText(file.toString());
+			cartTextOverlay.setFont(font);
+			polarTextOverlaySwitcher.setFont(font);
+			resetBumpMappingAndView();
+		}
+
+		private void loadDefaultFont() {
+			font = AlphaCharIO.readDefaultAlphaCharFont(null,true);
+			fontField.setText("<Default Font>");
+			cartTextOverlay.setFont(font);
+			polarTextOverlaySwitcher.setFont(font);
+			resetBumpMappingAndView();
 		}
 
 		void setShadingOptionsPanel(JPanel valuePanel) {
@@ -325,12 +386,12 @@ public class BumpMappingTest {
 			return comp;
 		}
 
-		@SuppressWarnings("unused")
-		private JButton createButton(String title, ActionListener al) {
-			JButton comp = new JButton(title);
-			if (al!=null) comp.addActionListener(al);
-			return comp;
-		}
+//		@SuppressWarnings("unused")
+//		private JButton createButton(String title, ActionListener al) {
+//			JButton comp = new JButton(title);
+//			if (al!=null) comp.addActionListener(al);
+//			return comp;
+//		}
 
 		private JButton createButton(String title, Consumer<JButton> action) {
 			JButton comp = new JButton(title);
@@ -500,7 +561,6 @@ public class BumpMappingTest {
 			return c;
 		}
 	
-		@SuppressWarnings("unused")
 		static GridBagConstraints setGridWidth(GridBagConstraints c, int gridwidth) {
 			c.gridwidth = gridwidth;
 			return c;
@@ -579,8 +639,12 @@ public class BumpMappingTest {
 		bumpMapping.reset();
 		gui.resultView.repaint();
 	}
+	
+	private interface FontUser {
+		void setFont(HashMap<Character,Form[]> font);
+	}
 
-	private static class TextOverlaySwitcher<ExtraObjType extends ExtraNormalFunction> {
+	private static class TextOverlaySwitcher<ExtraObjType extends ExtraNormalFunction> implements FontUser {
 		
 		interface Host<EOType> {
 			void setExtras(EOType extras);
@@ -618,6 +682,12 @@ public class BumpMappingTest {
 			textOverlays.add(new TextOverlay(label,textOverlay));
 		}
 		
+		@Override
+		public void setFont(HashMap<Character, Form[]> font) {
+			for (TextOverlay to:textOverlays)
+				to.textOverlay.setFont(font);
+		}
+
 		public void setHost(Host<ExtraObjType> host) {
 			this.host = host;
 			if (selected!=null) host.setExtras(selected.textOverlay.getExtraObj());
@@ -653,7 +723,7 @@ public class BumpMappingTest {
 		}
 	}
 
-	private static abstract class AbstractTextOverlay<ExtraObjType extends ExtraNormalFunction> {
+	private static abstract class AbstractTextOverlay<ExtraObjType extends ExtraNormalFunction> implements FontUser {
 		
 		protected GUI gui;
 		private MainWindowSettings settings;
@@ -733,6 +803,11 @@ public class BumpMappingTest {
 		}
 
 		@Override
+		public void setFont(HashMap<Character, Form[]> font) {
+			alphaCharSquence.setFont(font);
+		}
+
+		@Override
 		public JPanel createOptionsPanel(String title) {
 			GridBagConstraints c = new GridBagConstraints();
 			JPanel textPanel = new JPanel(new GridBagLayout());
@@ -765,6 +840,7 @@ public class BumpMappingTest {
 		private void setFontSize    (double fontSize_px    ) { this.fontSize_px     = setDoubleValue( this.fontSize_px    , fontSize_px    , MainWindowSettings.ValueKey.Polar_FontSize    , ()->alphaCharSquence.setScale  ( fontSize_px/100                         ) ); }
 		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , MainWindowSettings.ValueKey.Polar_LineWidth   , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
 		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , MainWindowSettings.ValueKey.Polar_LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
+		
 	}
 
 	private static class SpiralTextOverlay extends AbstractTextOverlay<ExtraNormalFunction.Polar> {
@@ -800,6 +876,11 @@ public class BumpMappingTest {
 		@Override
 		public ExtraNormalFunction.Polar getExtraObj() {
 			return bender;
+		}
+
+		@Override
+		public void setFont(HashMap<Character, Form[]> font) {
+			alphaCharSquence.setFont(font);
 		}
 
 		@Override
@@ -868,6 +949,11 @@ public class BumpMappingTest {
 		@Override
 		public ExtraNormalFunction getExtraObj() {
 			return centerer;
+		}
+
+		@Override
+		public void setFont(HashMap<Character, Form[]> font) {
+			alphaCharSquence.setFont(font);
 		}
 
 		@Override
