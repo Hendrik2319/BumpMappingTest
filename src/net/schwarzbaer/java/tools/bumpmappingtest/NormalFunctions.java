@@ -134,7 +134,19 @@ enum NormalFunctions {
 				)
 			);
 		}),
-		Spirale(() ->
+		Cone(() -> {
+			int radius = 200;
+			NormalXY vFace  = new NormalXY(0,1);
+			NormalXY vInner = ProfileXY.Constant.computeNormal(0, radius, radius/2, 0);
+			return new RotatedProfile(
+				new ProfileXY.Group(
+					new ProfileXY.Constant   (0, radius, vInner),
+					new ProfileXY.RoundBlend (radius, radius+6, vInner, vFace),
+					new ProfileXY.Constant   (radius+6, Double.POSITIVE_INFINITY)
+				)
+			);
+		}),
+		Spiral(() ->
 			new NormalFunction.Polar.Simple((w, r) -> {
 				double pAmpl = 60;
 				double rAmpl = r + w*pAmpl/Math.PI;
@@ -380,11 +392,20 @@ enum NormalFunctions {
 
 		}),
 		;
-		Supplier<NormalFunction> createNormalFunction;
-		NormalFunctions(Supplier<NormalFunction> createNormalFunction) {
+	
+		final Supplier<NormalFunction> createNormalFunction;
+		final String label;
+		NormalFunctions(Supplier<NormalFunction> createNormalFunction) { this(null, createNormalFunction); }
+		NormalFunctions(String label, Supplier<NormalFunction> createNormalFunction) {
 			this.createNormalFunction = createNormalFunction;
+			this.label = null;
 		}
 		
+		@Override
+		public String toString() {
+			if (label!=null) return label;
+			return super.toString();
+		}
 		private static RotatedProfile createRotaryCtrlProfile(double radius, double innerRing, double outerRing, double transition, double height) {
 			double r1 = radius/2;
 			double r2 = radius/2+innerRing;

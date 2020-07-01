@@ -19,6 +19,7 @@ import java.awt.image.BufferedImage;
 import java.lang.reflect.InvocationTargetException;
 import java.util.HashMap;
 import java.util.Locale;
+import java.util.Vector;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -94,6 +95,7 @@ public class BumpMappingTest {
 		
 		enum ValueKey {
 			WindowX, WindowY, WindowWidth, WindowHeight,
+			NormalFunction,Shading,
 			Polar_Text,Polar_Radius,Polar_RadiusOffset,Polar_Angle,Polar_FontSize,Polar_LineWidth,Polar_LineHeight,
 			Cart_Text,Cart_TextPosX,Cart_TextPosY,Cart_FontSize,Cart_LineWidth,Cart_LineHeight
 		}
@@ -124,7 +126,7 @@ public class BumpMappingTest {
 	private Normal sun;
 	private BumpMapping bumpMapping;
 	private CartTextOverlay  cartTextOverlay = null;
-	private PolarTextOverlay polarTextOverlay = null;
+	private TextOverlaySwitcher<ExtraNormalFunction.Polar> polarTextOverlaySwitcher;
 	private MainWindowSettings settings;
 	private GUI gui = null;
 	
@@ -146,7 +148,7 @@ public class BumpMappingTest {
 		private JPanel currentShadingOptionsPanel=null;
 		private JPanel currentTextOptionPanel = null;
 		private JPanel cartTextOptionPanel = null;
-		private JPanel polarTextOptionPanel = null;
+		private JPanel polarTextOverlaySwitcherPanel = null;
 		private JPanel dummyTextOptionPanel = null;
 	
 		private void create() {
@@ -154,8 +156,8 @@ public class BumpMappingTest {
 			mainwindow = new StandardMainWindow("BumpMappingTest");
 			settings = new MainWindowSettings();
 			
-			NormalFunctions initialNormalFunction = NormalFunctions.HemiSphereBubblesT;
-			Shadings initialShading = Shadings.Material;
+			NormalFunctions initialNormalFunction = settings.getEnum(MainWindowSettings.ValueKey.NormalFunction, NormalFunctions.HemiSphereBubblesT, NormalFunctions.class);
+			Shadings        initialShading        = settings.getEnum(MainWindowSettings.ValueKey.Shading       , Shadings.Material                 , Shadings       .class);
 			
 			resultView = new ResultView(bumpMapping);
 			resultView.setPreferredSize(new Dimension(450,350));
@@ -204,11 +206,13 @@ public class BumpMappingTest {
 			selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         BumpMappingTest.this::setNormalFunction),GBC.setGridPos(c,1,1));
 			selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                BumpMappingTest.this::setShading       ),GBC.setGridPos(c,1,2));
 			
+			polarTextOverlaySwitcher = new TextOverlaySwitcher<>(this);
+			polarTextOverlaySwitcher.add("Circular", new PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
+			polarTextOverlaySwitcher.add("Spiral"  , new PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
+			polarTextOverlaySwitcherPanel = polarTextOverlaySwitcher.createPanel("Polar Text Overlay");
 			
 			cartTextOverlay  = new CartTextOverlay (this,settings,"MxXBabcd", -100, -50, 30, 5, 1);
-			polarTextOverlay = new PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1);
-			cartTextOptionPanel  = cartTextOverlay.createOptionsPanel();
-			polarTextOptionPanel = polarTextOverlay.createOptionsPanel();
+			cartTextOptionPanel  = cartTextOverlay.createOptionsPanel("Cartesian Text Overlay");
 			dummyTextOptionPanel = new JPanel(new GridBagLayout());
 			dummyTextOptionPanel.setBorder(BorderFactory.createTitledBorder(""));
 			
@@ -349,20 +353,19 @@ public class BumpMappingTest {
 		private JTextField createDoubleInput(double value, Consumer<Double> setValue, Predicate<Double> isOK) {
 			Function<String,Double> parse = str->{ try { return Double.parseDouble(str); } catch (NumberFormatException e) { return Double.NaN; } };
 			Predicate<Double> isOK2 = v->v!=null && !Double.isNaN(v) && isOK.test(v);
-			Function<Double, String> toString = v->v==null ? "" : v.toString();
-			return createGenericTextField(value, toString, parse, isOK2, setValue);
+			return createGenericTextField(Double.toString(value), parse, isOK2, setValue);
 		}
 
 		private JTextField createTextInput(String value, Consumer<String> setValue, Predicate<String> isOK) {
-			return createGenericTextField(value, v->v, v->v, isOK, setValue, setValue);
+			return createGenericTextField(value, v->v, isOK, setValue, setValue);
 		}
 
-		private <V> JTextField createGenericTextField(V value, Function<V,String> toString, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue) {
-			return createGenericTextField(value, toString, parse, isOK, setValue, null);
+		private <V> JTextField createGenericTextField(String initialValue, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue) {
+			return createGenericTextField(initialValue, parse, isOK, setValue, null);
 		}
 
-		private <V> JTextField createGenericTextField(V value, Function<V,String> toString, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue, Consumer<V> setValueWhileAdjusting) {
-			JTextField comp = new JTextField(toString.apply(value));
+		private <V> JTextField createGenericTextField(String initialValue, Function<String,V> parse, Predicate<V> isOK, Consumer<V> setValue, Consumer<V> setValueWhileAdjusting) {
+			JTextField comp = new JTextField(initialValue,5);
 			Color defaultBG = comp.getBackground();
 			if (setValueWhileAdjusting!=null) {
 				comp.addCaretListener (e -> {
@@ -395,7 +398,12 @@ public class BumpMappingTest {
 		}
 
 		private <T> JComboBox<T> createComboBox(T[] values, T selectedValue, Consumer<T> valueChanged) {
-			JComboBox<T> comp = new JComboBox<T>(values);
+			return setComboBox(new JComboBox<T>(values), selectedValue, valueChanged);
+		}
+		private <T> JComboBox<T> createComboBox(Vector<T> values, T selectedValue, Consumer<T> valueChanged) {
+			return setComboBox(new JComboBox<T>(values), selectedValue, valueChanged);
+		}
+		private <T> JComboBox<T> setComboBox(JComboBox<T> comp, T selectedValue, Consumer<T> valueChanged) {
 			comp.setSelectedItem(selectedValue);
 			if (valueChanged!=null) comp.addActionListener(e->{
 				int i = comp.getSelectedIndex();
@@ -507,6 +515,7 @@ public class BumpMappingTest {
 	}
 	
 	private void setShading(Shadings sh) {
+		settings.putEnum(MainWindowSettings.ValueKey.Shading, sh);
 		gui.setShadingOptionsPanel(sh.valuePanel);
 		bumpMapping.setShading(sh.shading);
 		bumpMapping.setSun(sun.x,sun.y,sun.z);
@@ -514,6 +523,8 @@ public class BumpMappingTest {
 	}
 
 	private void setNormalFunction(NormalFunctions nf) {
+		settings.putEnum(MainWindowSettings.ValueKey.NormalFunction, nf);
+		
 		NormalFunction normalFunction = nf.createNormalFunction.get();
 		
 		JPanel textOptionPanel = gui.dummyTextOptionPanel;
@@ -524,8 +535,8 @@ public class BumpMappingTest {
 			
 		} else if (normalFunction instanceof ExtraNormalFunction.PolarHost) {
 			ExtraNormalFunction.PolarHost host = (ExtraNormalFunction.PolarHost) normalFunction;
-			host.setExtras(polarTextOverlay.getExtraObj());
-			textOptionPanel = gui.polarTextOptionPanel;
+			polarTextOverlaySwitcher.setHost(host::setExtras);
+			textOptionPanel = gui.polarTextOverlaySwitcherPanel;
 		}
 		
 		gui.setTextOptionsPanel(textOptionPanel);
@@ -562,15 +573,68 @@ public class BumpMappingTest {
 		);
 	}
 
-	private static abstract class AbstractTextOverlay<ExtraObjType extends ExtraNormalFunction> {
-		/*
-		enum ValueGroup implements Settings.GroupKeys<ValueKey> {
-			;
-			ValueKey[] keys;
-			ValueGroup(ValueKey...keys) { this.keys = keys;}
-			@Override public ValueKey[] getKeys() { return keys; }
+	private static class TextOverlaySwitcher<ExtraObjType extends ExtraNormalFunction> {
+		
+		interface Host<EOType> {
+			void setExtras(EOType extras);
 		}
-		*/
+		
+		private class TextOverlay{
+			
+			private final String label;
+			private final AbstractTextOverlay<ExtraObjType> textOverlay;
+			private final JPanel panel;
+			
+			TextOverlay(String label, AbstractTextOverlay<ExtraObjType> textOverlay) {
+				this.label = label;
+				this.textOverlay = textOverlay;
+				this.panel = this.textOverlay.createOptionsPanel(null);
+			}
+
+			@Override public String toString() { return label; }
+		}
+		
+		private final Vector<TextOverlay> textOverlays = new Vector<>();
+		private TextOverlay selected = null;
+		private Host<ExtraObjType> host = null;
+		private final GUI gui;
+		
+		public TextOverlaySwitcher(GUI gui) {
+			this.gui = gui;
+		}
+
+		void add(String label, AbstractTextOverlay<ExtraObjType> textOverlay) {
+			textOverlays.add(new TextOverlay(label,textOverlay));
+		}
+		
+		public void setHost(Host<ExtraObjType> host) {
+			this.host = host;
+			if (selected!=null) host.setExtras(selected.textOverlay.getExtraObj());
+		}
+
+		public JPanel createPanel(String title) {
+			selected = textOverlays.firstElement();
+			JPanel textPanel = new JPanel(new BorderLayout(3,3));
+			textPanel.setBorder(BorderFactory.createTitledBorder(title));
+			textPanel.add(selected.panel,BorderLayout.CENTER);
+			textPanel.add(gui.createComboBox(textOverlays, selected, v->{
+				if (selected!=null) textPanel.remove(selected.panel);
+				selected = v;
+				if (selected!=null) {
+					textPanel.add(selected.panel,BorderLayout.CENTER);
+					if (host!=null) {
+						host.setExtras(selected.textOverlay.getExtraObj());
+						gui.resetBumpMappingAndView();
+					}
+				}
+				textPanel.revalidate();
+				textPanel.repaint();
+			}),BorderLayout.NORTH);
+			return textPanel;
+		}
+	}
+
+	private static abstract class AbstractTextOverlay<ExtraObjType extends ExtraNormalFunction> {
 		
 		protected GUI gui;
 		private MainWindowSettings settings;
@@ -581,7 +645,7 @@ public class BumpMappingTest {
 		}
 		
 		public abstract ExtraObjType getExtraObj();
-		public abstract JPanel createOptionsPanel();
+		public abstract JPanel createOptionsPanel(String title);
 		
 		protected double setDoubleValue(double oldValue, double newValue, MainWindowSettings.ValueKey valueKey, Runnable setValue) {
 			return setValue(oldValue, newValue, ()->{ settings.putDouble(valueKey, newValue); setValue.run(); });
@@ -630,10 +694,10 @@ public class BumpMappingTest {
 		}
 
 		@Override
-		public JPanel createOptionsPanel() {
+		public JPanel createOptionsPanel(String title) {
 			GridBagConstraints c = new GridBagConstraints();
 			JPanel textPanel = new JPanel(new GridBagLayout());
-			textPanel.setBorder(BorderFactory.createTitledBorder("Text Options"));
+			if (title!=null) textPanel.setBorder(BorderFactory.createTitledBorder(title));
 			GBC.reset(c);
 			GBC.setFill(c, GBC.GridFill.HORIZONTAL);
 			GBC.setWeights(c,0,0);
@@ -694,10 +758,10 @@ public class BumpMappingTest {
 		}
 
 		@Override
-		public JPanel createOptionsPanel() {
+		public JPanel createOptionsPanel(String title) {
 			GridBagConstraints c = new GridBagConstraints();
 			JPanel textPanel = new JPanel(new GridBagLayout());
-			textPanel.setBorder(BorderFactory.createTitledBorder("Text Options"));
+			if (title!=null) textPanel.setBorder(BorderFactory.createTitledBorder(title));
 			GBC.reset(c);
 			GBC.setFill(c, GBC.GridFill.HORIZONTAL);
 			GBC.setWeights(c,0,0);
