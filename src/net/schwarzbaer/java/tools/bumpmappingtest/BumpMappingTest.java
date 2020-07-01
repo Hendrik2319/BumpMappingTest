@@ -103,7 +103,7 @@ public class BumpMappingTest {
 			NormalFunction, Shading, SelectedPolarTextOverlay,
 			Cart_Text, Cart_FontSize, Cart_TextPosX, Cart_TextPosY, Cart_LineWidth, Cart_LineHeight,
 			Polar_Text, Polar_FontSize, Polar_Radius, Polar_RadiusOffset, Polar_Angle, Polar_LineWidth, Polar_LineHeight,
-			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_LineWidth, Spiral_LineHeight, UseDefaultFont, FontFile
+			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_LineWidth, Spiral_LineHeight, UseDefaultFont, FontFile, SunX, SunY, SunZ
 		}
 
 		public MainWindowSettings() { super(BumpMappingTest.class); }
@@ -130,16 +130,23 @@ public class BumpMappingTest {
 	}
 
 	private Normal sun;
-	private BumpMapping bumpMapping;
-	private MainWindowSettings settings;
+	private final BumpMapping bumpMapping;
+	private final MainWindowSettings settings;
 	private CartTextOverlay  cartTextOverlay = null;
 	private TextOverlaySwitcher<ExtraNormalFunction.Polar> polarTextOverlaySwitcher = null;
 	private GUI gui = null;
 	
 	private BumpMappingTest() {
-		sun = new Normal(1,-1,2).normalize();
 		bumpMapping = new BumpMapping(true,true);
 		settings = new MainWindowSettings();
+		
+		double sunX = settings.getDouble(MainWindowSettings.ValueKey.SunX, Double.NaN);
+		double sunY = settings.getDouble(MainWindowSettings.ValueKey.SunY, Double.NaN);
+		double sunZ = settings.getDouble(MainWindowSettings.ValueKey.SunZ, Double.NaN);
+		if (!Double.isNaN(sunX) && !Double.isNaN(sunY) && !Double.isNaN(sunZ))
+			sun = new Normal(sunX,sunY,sunZ).normalize();
+		else
+			sun = new Normal(1,-1,2).normalize();
 	}
 	
 	private void createGUI() {
@@ -163,7 +170,6 @@ public class BumpMappingTest {
 		GUI() {
 			GridBagConstraints c = new GridBagConstraints();
 			mainwindow = new StandardMainWindow("BumpMappingTest");
-			settings = new MainWindowSettings();
 			
 			fontFileChooser = new FileChooser("Font-File", AlphaCharIO.ALPHACHARFONT_EXTENSION);
 			
@@ -194,6 +200,11 @@ public class BumpMappingTest {
 			directionControl.setPreferredSize(new Dimension(300,300));
 			directionControl.addValueChangeListener((x,y,z)->{
 				sun = new Normal(x,y,z);
+				if (!directionControl.isAdjusting()) {
+					settings.putDouble(MainWindowSettings.ValueKey.SunX, x);
+					settings.putDouble(MainWindowSettings.ValueKey.SunY, y);
+					settings.putDouble(MainWindowSettings.ValueKey.SunZ, z);
+				}
 				bumpMapping.setSun(x,y,z);
 				resultView.repaint();
 				sunOutput.setText(String.format(Locale.ENGLISH, "new Normal( %1.3f, %1.3f, %1.3f )", x,y,z));
