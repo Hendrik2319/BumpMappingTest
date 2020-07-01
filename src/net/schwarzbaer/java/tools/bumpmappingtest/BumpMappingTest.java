@@ -103,7 +103,7 @@ public class BumpMappingTest {
 			NormalFunction, Shading, SelectedPolarTextOverlay,
 			Cart_Text, Cart_FontSize, Cart_TextPosX, Cart_TextPosY, Cart_LineWidth, Cart_LineHeight,
 			Polar_Text, Polar_FontSize, Polar_Radius, Polar_RadiusOffset, Polar_Angle, Polar_LineWidth, Polar_LineHeight,
-			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_LineWidth, Spiral_LineHeight
+			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_LineWidth, Spiral_LineHeight, UseDefaultFont, FontFile
 		}
 
 		public MainWindowSettings() { super(BumpMappingTest.class); }
@@ -317,12 +317,34 @@ public class BumpMappingTest {
 					@Override public void componentResized(ComponentEvent e) { settings.setWindowSize( mainwindow.getSize() ); }
 					@Override public void componentMoved  (ComponentEvent e) { settings.setWindowPos ( mainwindow.getLocation() ); }
 				});
+				
+				loadInitialFont();
 			};
 			
 		}
 		
 		void init() { init.run(); init=null; }
 
+		private void loadInitialFont() {
+			boolean useDefaultFont = settings.getBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
+			String fontFilePath = settings.getString(MainWindowSettings.ValueKey.FontFile, null);
+			
+			File fontFile = null;
+			if (fontFilePath!=null) {
+				fontFile = new File(fontFilePath);
+				if (!fontFile.isFile())
+					fontFile = null;
+			}
+			
+			if (useDefaultFont || fontFile==null)
+				loadDefaultFont();
+			else
+				loadFont(fontFile);
+			
+			if (fontFile!=null)
+				fontFileChooser.setSelectedFile(fontFile);
+			
+		}
 		private void loadFont() {
 			
 			String title = "Load Default Font?";
@@ -336,14 +358,17 @@ public class BumpMappingTest {
 				break;
 				
 			case JOptionPane.NO_OPTION:
-				if (fontFileChooser.showOpenDialog(mainwindow) == FileChooser.APPROVE_OPTION)
+				if (fontFileChooser.showOpenDialog(mainwindow) == FileChooser.APPROVE_OPTION) {
 					loadFont(fontFileChooser.getSelectedFile());
+				}
 				break;
 				
 			}
 		}
 
 		private void loadFont(File file) {
+			settings.putBool  (MainWindowSettings.ValueKey.UseDefaultFont, false);
+			settings.putString(MainWindowSettings.ValueKey.FontFile, file.getAbsolutePath());
 			font = AlphaCharIO.readAlphaCharFontFromFile(file, null, true);
 			fontField.setText(file.toString());
 			cartTextOverlay.setFont(font);
@@ -352,6 +377,7 @@ public class BumpMappingTest {
 		}
 
 		private void loadDefaultFont() {
+			settings.putBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
 			font = AlphaCharIO.readDefaultAlphaCharFont(null,true);
 			fontField.setText("<Default Font>");
 			cartTextOverlay.setFont(font);
@@ -628,16 +654,19 @@ public class BumpMappingTest {
 		
 		gui.setTextOptionsPanel(textOptionPanel);
 		bumpMapping.setNormalFunction(normalFunction);
-		gui.resultView.repaint();
+		if (gui.mainwindow.isVisible())
+			gui.resultView.repaint();
 	}
 
 	private void setOverSampling(OverSampling os) {
 		bumpMapping.setOverSampling(os);
-		gui.resultView.repaint();
+		if (gui.mainwindow.isVisible())
+			gui.resultView.repaint();
 	}
 	private void resetBumpMappingAndView() {
 		bumpMapping.reset();
-		gui.resultView.repaint();
+		if (gui.mainwindow.isVisible())
+			gui.resultView.repaint();
 	}
 	
 	private interface FontUser {
