@@ -36,6 +36,8 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.event.CaretEvent;
+import javax.swing.event.CaretListener;
 
 import net.schwarzbaer.gui.BumpmappingSunControl;
 import net.schwarzbaer.gui.Canvas;
@@ -53,6 +55,7 @@ import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Cart.AlphaCharSquence;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Centerer;
 import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Polar.BentCartExtra;
+import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Polar.SpiralBentCartExtra;
 import net.schwarzbaer.image.bumpmapping.NormalFunction;
 import net.schwarzbaer.image.bumpmapping.ProfileXY;
 import net.schwarzbaer.image.bumpmapping.Shading;
@@ -95,9 +98,10 @@ public class BumpMappingTest {
 		
 		enum ValueKey {
 			WindowX, WindowY, WindowWidth, WindowHeight,
-			NormalFunction,Shading,
-			Polar_Text,Polar_Radius,Polar_RadiusOffset,Polar_Angle,Polar_FontSize,Polar_LineWidth,Polar_LineHeight,
-			Cart_Text,Cart_TextPosX,Cart_TextPosY,Cart_FontSize,Cart_LineWidth,Cart_LineHeight
+			NormalFunction, Shading, SelectedPolarTextOverlay,
+			Cart_Text, Cart_FontSize, Cart_TextPosX, Cart_TextPosY, Cart_LineWidth, Cart_LineHeight,
+			Polar_Text, Polar_FontSize, Polar_Radius, Polar_RadiusOffset, Polar_Angle, Polar_LineWidth, Polar_LineHeight,
+			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_LineWidth, Spiral_LineHeight
 		}
 
 		public MainWindowSettings() { super(BumpMappingTest.class); }
@@ -206,9 +210,9 @@ public class BumpMappingTest {
 			selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         BumpMappingTest.this::setNormalFunction),GBC.setGridPos(c,1,1));
 			selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                BumpMappingTest.this::setShading       ),GBC.setGridPos(c,1,2));
 			
-			polarTextOverlaySwitcher = new TextOverlaySwitcher<>(this);
-			polarTextOverlaySwitcher.add("Circular", new PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
-			polarTextOverlaySwitcher.add("Spiral"  , new PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
+			polarTextOverlaySwitcher = new TextOverlaySwitcher<ExtraNormalFunction.Polar>(this,settings,MainWindowSettings.ValueKey.SelectedPolarTextOverlay);
+			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
+			polarTextOverlaySwitcher.add("Spiral"  , new SpiralTextOverlay(this,settings,"MxXBabcd", 100, 15, 35, -90, 30, 5, 1));
 			polarTextOverlaySwitcherPanel = polarTextOverlaySwitcher.createPanel("Polar Text Overlay");
 			
 			cartTextOverlay  = new CartTextOverlay (this,settings,"MxXBabcd", -100, -50, 30, 5, 1);
@@ -368,12 +372,14 @@ public class BumpMappingTest {
 			JTextField comp = new JTextField(initialValue,5);
 			Color defaultBG = comp.getBackground();
 			if (setValueWhileAdjusting!=null) {
-				comp.addCaretListener (e -> {
-					readTextField(comp,defaultBG,parse,isOK,v -> {
-						setValueWhileAdjusting.accept(v);
-						resetBumpMappingAndView();
-					});
-				});
+				comp.addCaretListener (
+					new TextChangeListener(() -> {
+						readTextField(comp,defaultBG,parse,isOK,v -> {
+							setValueWhileAdjusting.accept(v);
+							resetBumpMappingAndView();
+						});
+					})
+				);
 			}
 			Consumer<V> modifiedSetValue = d -> {
 				setValue.accept(d);
@@ -411,6 +417,27 @@ public class BumpMappingTest {
 			});
 			return comp;
 		}
+	}
+	
+	private static class TextChangeListener implements CaretListener {
+		private String text = null;
+		private final Runnable action;
+		
+		TextChangeListener(Runnable action) {
+			this.action = action;
+		}
+		
+		@Override
+		public void caretUpdate(CaretEvent e) {
+			Object source = e.getSource();
+			if (!(source instanceof JTextField)) return;
+			JTextField comp = (JTextField) source;
+			String newText = comp.getText();
+			if (newText.equals(text)) return;
+			text = newText;
+			action.run();
+		}
+		
 	}
 	
 	private static class GBC {
@@ -553,26 +580,6 @@ public class BumpMappingTest {
 		gui.resultView.repaint();
 	}
 
-	private static ProfileXY createProfile(double lineWidth, double lineHeight) {
-		lineWidth  = Math.max(lineWidth , 0.01);
-		lineHeight = Math.max(lineHeight, 0.01);
-		
-		double x1 =  0 + lineWidth/6;
-		double x2 = x1 + lineWidth/6;
-		double x3 = x2 + lineWidth/6;
-		double xO = x3 + lineWidth/6;
-		
-		NormalXY vFace  = new NormalXY(0,1);
-		NormalXY vRamp = ProfileXY.Constant.computeNormal(x2,x3, 0,lineHeight);
-		
-		return new ProfileXY.Group(
-			new ProfileXY.Constant  ( 0, x1 ),
-			new ProfileXY.RoundBlend(x1, x2, vFace,vRamp),
-			new ProfileXY.Constant  (x2, x3, vRamp),
-			new ProfileXY.RoundBlend(x3, xO, vRamp,vFace)
-		);
-	}
-
 	private static class TextOverlaySwitcher<ExtraObjType extends ExtraNormalFunction> {
 		
 		interface Host<EOType> {
@@ -598,9 +605,13 @@ public class BumpMappingTest {
 		private TextOverlay selected = null;
 		private Host<ExtraObjType> host = null;
 		private final GUI gui;
+		private final MainWindowSettings settings;
+		private final MainWindowSettings.ValueKey valueKey;
 		
-		public TextOverlaySwitcher(GUI gui) {
+		public TextOverlaySwitcher(GUI gui, MainWindowSettings settings, MainWindowSettings.ValueKey valueKey) {
 			this.gui = gui;
+			this.settings = settings;
+			this.valueKey = valueKey;
 		}
 
 		void add(String label, AbstractTextOverlay<ExtraObjType> textOverlay) {
@@ -613,7 +624,14 @@ public class BumpMappingTest {
 		}
 
 		public JPanel createPanel(String title) {
+			String selectedTOlabel = settings.getString(valueKey,null);
 			selected = textOverlays.firstElement();
+			if (selectedTOlabel!=null)
+				for (TextOverlay to:textOverlays)
+					if (to.label.equals(selectedTOlabel)) {
+						selected = to;
+						break;
+					}
 			JPanel textPanel = new JPanel(new BorderLayout(3,3));
 			textPanel.setBorder(BorderFactory.createTitledBorder(title));
 			textPanel.add(selected.panel,BorderLayout.CENTER);
@@ -621,6 +639,7 @@ public class BumpMappingTest {
 				if (selected!=null) textPanel.remove(selected.panel);
 				selected = v;
 				if (selected!=null) {
+					settings.putString(valueKey,selected.label);
 					textPanel.add(selected.panel,BorderLayout.CENTER);
 					if (host!=null) {
 						host.setExtras(selected.textOverlay.getExtraObj());
@@ -658,6 +677,26 @@ public class BumpMappingTest {
 			setValue.run();
 			gui.resetBumpMappingAndView();
 			return newValue;
+		}
+
+		protected static ProfileXY createProfile(double lineWidth, double lineHeight) {
+			lineWidth  = Math.max(lineWidth , 0.01);
+			lineHeight = Math.max(lineHeight, 0.01);
+			
+			double x1 =  0 + lineWidth/6;
+			double x2 = x1 + lineWidth/6;
+			double x3 = x2 + lineWidth/6;
+			double xO = x3 + lineWidth/6;
+			
+			NormalXY vFace  = new NormalXY(0,1);
+			NormalXY vRamp = ProfileXY.Constant.computeNormal(x2,x3, 0,lineHeight);
+			
+			return new ProfileXY.Group(
+				new ProfileXY.Constant  ( 0, x1 ),
+				new ProfileXY.RoundBlend(x1, x2, vFace,vRamp),
+				new ProfileXY.Constant  (x2, x3, vRamp),
+				new ProfileXY.RoundBlend(x3, xO, vRamp,vFace)
+			);
 		}
 	}
 
@@ -726,6 +765,80 @@ public class BumpMappingTest {
 		private void setFontSize    (double fontSize_px    ) { this.fontSize_px     = setDoubleValue( this.fontSize_px    , fontSize_px    , MainWindowSettings.ValueKey.Polar_FontSize    , ()->alphaCharSquence.setScale  ( fontSize_px/100                         ) ); }
 		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , MainWindowSettings.ValueKey.Polar_LineWidth   , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
 		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , MainWindowSettings.ValueKey.Polar_LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
+	}
+
+	private static class SpiralTextOverlay extends AbstractTextOverlay<ExtraNormalFunction.Polar> {
+		
+		private static final double DEG2RAD = 1/180.0*Math.PI;
+		
+		private String text;
+		private double fontSize_px;
+		private double radius_px;
+		private double radiusOffset_px;
+		private double rowHeight_px;
+		private double angle_deg;
+		private double lineWidth_px;
+		private double lineHeight_px;
+		private final AlphaCharSquence alphaCharSquence;
+		private final SpiralBentCartExtra bender;
+
+		public SpiralTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double rowHeight_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px) {
+			super(gui,settings);
+			this.text            = settings.getString(MainWindowSettings.ValueKey.Spiral_Text        , text           );
+			this.fontSize_px     = settings.getDouble(MainWindowSettings.ValueKey.Spiral_FontSize    , fontSize_px    );
+			this.radius_px       = settings.getDouble(MainWindowSettings.ValueKey.Spiral_Radius      , radius_px      );
+			this.radiusOffset_px = settings.getDouble(MainWindowSettings.ValueKey.Spiral_RadiusOffset, radiusOffset_px);
+			this.rowHeight_px    = settings.getDouble(MainWindowSettings.ValueKey.Spiral_RowHeight   , rowHeight_px   );
+			this.angle_deg       = settings.getDouble(MainWindowSettings.ValueKey.Spiral_Angle       , angle_deg      );
+			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Spiral_LineWidth   , lineWidth_px   );
+			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Spiral_LineHeight  , lineHeight_px  );
+			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
+			alphaCharSquence = new AlphaCharSquence(0,1.5*this.lineWidth_px, this.fontSize_px/100, profile, this.text, font);
+			bender = new SpiralBentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, this.rowHeight_px, this.radiusOffset_px, alphaCharSquence);
+		}
+
+		@Override
+		public ExtraNormalFunction.Polar getExtraObj() {
+			return bender;
+		}
+
+		@Override
+		public JPanel createOptionsPanel(String title) {
+			int i;
+			GridBagConstraints c = new GridBagConstraints();
+			JPanel textPanel = new JPanel(new GridBagLayout());
+			if (title!=null) textPanel.setBorder(BorderFactory.createTitledBorder(title));
+			GBC.reset(c);
+			GBC.setFill(c, GBC.GridFill.HORIZONTAL);
+			GBC.setWeights(c,0,0); i = 0;
+			textPanel.add(new JLabel("Text: "              , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Font Size (px): "    , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Radius (px): "       , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Radius Offset (px): ", SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Row Height (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Start Angle (deg): " , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Line Width (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Line Depth (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			GBC.setWeights(c,1,0); i = 0;
+			textPanel.add(gui.createTextInput  (text           , this::setText        , v->!v.isEmpty()   ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(fontSize_px    , this::setFontSize    , v->v>0            ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(radius_px      , this::setRadius      , v->v>0            ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(radiusOffset_px, this::setRadiusOffset, v->v>-radius_px   ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(rowHeight_px   , this::setRowHeight   , v->v>fontSize_px/4),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(angle_deg      , this::setAngle                           ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(lineWidth_px   , this::setLineWidth   , v->v>0.01         ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(lineHeight_px  , this::setLineHeight  , v->v>0.01         ),GBC.setGridPos(c,1,i++));
+			return textPanel;
+		}
+		
+		private void setText        (String text           ) { this.text            = setStringValue( this.text           , text           , MainWindowSettings.ValueKey.Spiral_Text        , ()->alphaCharSquence.setText   ( text                                    ) ); }
+		private void setFontSize    (double fontSize_px    ) { this.fontSize_px     = setDoubleValue( this.fontSize_px    , fontSize_px    , MainWindowSettings.ValueKey.Spiral_FontSize    , ()->alphaCharSquence.setScale  ( fontSize_px/100                         ) ); }
+		private void setRadius      (double radius_px      ) { this.radius_px       = setDoubleValue( this.radius_px      , radius_px      , MainWindowSettings.ValueKey.Spiral_Radius      , ()->bender     .setZeroYRadius ( radius_px                               ) ); }
+		private void setRadiusOffset(double radiusOffset_px) { this.radiusOffset_px = setDoubleValue( this.radiusOffset_px, radiusOffset_px, MainWindowSettings.ValueKey.Spiral_RadiusOffset, ()->bender     .setRadiusOffset( radiusOffset_px                         ) ); }
+		private void setRowHeight   (double rowHeight_px   ) { this.rowHeight_px    = setDoubleValue( this.rowHeight_px   , rowHeight_px   , MainWindowSettings.ValueKey.Spiral_RowHeight   , ()->bender     .setRowHeight   ( rowHeight_px                            ) ); }
+		private void setAngle       (double angle_deg      ) { this.angle_deg       = setDoubleValue( this.angle_deg      , angle_deg      , MainWindowSettings.ValueKey.Spiral_Angle       , ()->bender     .setZeroXAngle  ( angle_deg*DEG2RAD                       ) ); }
+		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , MainWindowSettings.ValueKey.Spiral_LineWidth   , ()->{ alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)); alphaCharSquence.setY(1.5*lineWidth_px); } ); }
+		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , MainWindowSettings.ValueKey.Spiral_LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
 	}
 
 	private static class CartTextOverlay extends AbstractTextOverlay<ExtraNormalFunction> {
