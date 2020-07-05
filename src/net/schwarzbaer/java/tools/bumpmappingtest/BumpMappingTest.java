@@ -10,6 +10,7 @@ import java.awt.GridLayout;
 import java.awt.Insets;
 import java.awt.Point;
 import java.awt.Window;
+import java.awt.event.ActionListener;
 import java.awt.event.ComponentEvent;
 import java.awt.event.ComponentListener;
 import java.awt.event.FocusEvent;
@@ -70,13 +71,9 @@ import net.schwarzbaer.system.Settings;
 
 public class BumpMappingTest {
 
-	private static HashMap<Character, Form[]> font;
-
 	public static void main(String[] args) {
 		try { UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName()); }
 		catch (ClassNotFoundException | InstantiationException | IllegalAccessException | UnsupportedLookAndFeelException e) {}
-		
-		font = AlphaCharIO.readDefaultAlphaCharFont(null,true);
 		
 		new BumpMappingTest().createGUI();
 	}
@@ -129,6 +126,7 @@ public class BumpMappingTest {
 		}
 	}
 
+	private Font font;
 	private Normal sun;
 	private final BumpMapping bumpMapping;
 	private final MainWindowSettings settings;
@@ -139,6 +137,8 @@ public class BumpMappingTest {
 	private BumpMappingTest() {
 		bumpMapping = new BumpMapping(true,true);
 		settings = new MainWindowSettings();
+		
+		font = Font.loadInitialFont(settings); // AlphaCharIO.readDefaultAlphaCharFont(null,true);
 		
 		double sunX = settings.getDouble(MainWindowSettings.ValueKey.SunX, Double.NaN);
 		double sunY = settings.getDouble(MainWindowSettings.ValueKey.SunY, Double.NaN);
@@ -172,6 +172,8 @@ public class BumpMappingTest {
 			mainwindow = new StandardMainWindow("BumpMappingTest");
 			
 			fontFileChooser = new FileChooser("Font-File", AlphaCharIO.ALPHACHARFONT_EXTENSION);
+			if (font.fontFile!=null)
+				fontFileChooser.setSelectedFile(font.fontFile);
 			
 			NormalFunctions initialNormalFunction = settings.getEnum(MainWindowSettings.ValueKey.NormalFunction, NormalFunctions.HemiSphereBubblesT, NormalFunctions.class);
 			Shadings        initialShading        = settings.getEnum(MainWindowSettings.ValueKey.Shading       , Shadings.Material                 , Shadings       .class);
@@ -232,17 +234,17 @@ public class BumpMappingTest {
 			selectionPanel.add(createComboBox(NormalFunctions.values(), initialNormalFunction,         BumpMappingTest.this::setNormalFunction),GBC.setGridPos(c,1,i++));
 			selectionPanel.add(createComboBox(Shadings       .values(), initialShading,                BumpMappingTest.this::setShading       ),GBC.setGridPos(c,1,i++));
 			
-			fontField = new JTextField("",5);
+			fontField = new JTextField(getFontLabel(),5);
 			fontField.setEditable(false);
 			GBC.setGridWidth(c,1); selectionPanel.add(fontField,GBC.setGridPos(c,1,i));
-			GBC.setWeights(c,0,0); selectionPanel.add(createButton("...", b->loadFont()),GBC.setGridPos(c,2,i));
+			GBC.setWeights(c,0,0); selectionPanel.add(createButton("...", (JButton b)->loadFont()),GBC.setGridPos(c,2,i));
 			
 			polarTextOverlaySwitcher = new TextOverlaySwitcher<ExtraNormalFunction.Polar>(this,settings,MainWindowSettings.ValueKey.SelectedPolarTextOverlay);
-			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1));
-			polarTextOverlaySwitcher.add("Spiral"  , new SpiralTextOverlay(this,settings,"MxXBabcd", 100, 15, 35, -90, 30, 5, 1));
+			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1, font.font));
+			polarTextOverlaySwitcher.add("Spiral"  , new SpiralTextOverlay(this,settings,"MxXBabcd", 100, 15, 35, -90, 30, 5, 1, font.font));
 			polarTextOverlaySwitcherPanel = polarTextOverlaySwitcher.createPanel("Polar Text Overlay");
 			
-			cartTextOverlay  = new CartTextOverlay (this,settings,"MxXBabcd", -100, -50, 30, 5, 1);
+			cartTextOverlay  = new CartTextOverlay (this,settings,"MxXBabcd", -100, -50, 30, 5, 1, font.font);
 			cartTextOptionPanel  = cartTextOverlay.createOptionsPanel("Cartesian Text Overlay");
 			dummyTextOptionPanel = new JPanel(new GridBagLayout());
 			dummyTextOptionPanel.setBorder(BorderFactory.createTitledBorder(""));
@@ -329,71 +331,43 @@ public class BumpMappingTest {
 					@Override public void componentMoved  (ComponentEvent e) { settings.setWindowPos ( mainwindow.getLocation() ); }
 				});
 				
-				loadInitialFont();
 			};
 			
 		}
 		
 		void init() { init.run(); init=null; }
 
-		private void loadInitialFont() {
-			boolean useDefaultFont = settings.getBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
-			String fontFilePath = settings.getString(MainWindowSettings.ValueKey.FontFile, null);
-			
-			File fontFile = null;
-			if (fontFilePath!=null) {
-				fontFile = new File(fontFilePath);
-				if (!fontFile.isFile())
-					fontFile = null;
-			}
-			
-			if (useDefaultFont || fontFile==null)
-				loadDefaultFont();
-			else
-				loadFont(fontFile);
-			
-			if (fontFile!=null)
-				fontFileChooser.setSelectedFile(fontFile);
-			
-		}
 		private void loadFont() {
 			
 			String title = "Load Default Font?";
 			String message = "Do you want to load the default font?";
 			int result = JOptionPane.showConfirmDialog(mainwindow, message, title, JOptionPane.YES_NO_CANCEL_OPTION);
 			
-			switch (result) {
+			File file;
+			if (result==JOptionPane.YES_OPTION) {
+				font.loadDefaultFont();
+				fontField.setText("<Default Font>");
+				
+			} else if (
+					result==JOptionPane.NO_OPTION &&
+					fontFileChooser.showOpenDialog(mainwindow)==FileChooser.APPROVE_OPTION &&
+					(file=fontFileChooser.getSelectedFile()).isFile()
+				) {
+				font.loadFont(file);
+				fontField.setText(file.getAbsolutePath());
+				
+			} else
+				return;
 			
-			case JOptionPane.YES_OPTION:
-				loadDefaultFont();
-				break;
-				
-			case JOptionPane.NO_OPTION:
-				if (fontFileChooser.showOpenDialog(mainwindow) == FileChooser.APPROVE_OPTION) {
-					loadFont(fontFileChooser.getSelectedFile());
-				}
-				break;
-				
-			}
-		}
-
-		private void loadFont(File file) {
-			settings.putBool  (MainWindowSettings.ValueKey.UseDefaultFont, false);
-			settings.putString(MainWindowSettings.ValueKey.FontFile, file.getAbsolutePath());
-			font = AlphaCharIO.readAlphaCharFontFromFile(file, null, true);
-			fontField.setText(file.toString());
-			cartTextOverlay.setFont(font);
-			polarTextOverlaySwitcher.setFont(font);
+			cartTextOverlay.setFont(font.font);
+			polarTextOverlaySwitcher.setFont(font.font);
 			resetBumpMappingAndView();
 		}
-
-		private void loadDefaultFont() {
-			settings.putBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
-			font = AlphaCharIO.readDefaultAlphaCharFont(null,true);
-			fontField.setText("<Default Font>");
-			cartTextOverlay.setFont(font);
-			polarTextOverlaySwitcher.setFont(font);
-			resetBumpMappingAndView();
+		
+		private String getFontLabel() {
+			if (font.useDefaultFont) return "<Default Font>";
+			if (font.fontFile!=null) return font.fontFile.getAbsolutePath();
+			return "???";
 		}
 
 		void setShadingOptionsPanel(JPanel valuePanel) {
@@ -423,12 +397,12 @@ public class BumpMappingTest {
 			return comp;
 		}
 
-//		@SuppressWarnings("unused")
-//		private JButton createButton(String title, ActionListener al) {
-//			JButton comp = new JButton(title);
-//			if (al!=null) comp.addActionListener(al);
-//			return comp;
-//		}
+		@SuppressWarnings("unused")
+		private JButton createButton(String title, ActionListener al) {
+			JButton comp = new JButton(title);
+			if (al!=null) comp.addActionListener(al);
+			return comp;
+		}
 
 		private JButton createButton(String title, Consumer<JButton> action) {
 			JButton comp = new JButton(title);
@@ -515,6 +489,51 @@ public class BumpMappingTest {
 			});
 			return comp;
 		}
+	}
+	
+	private static class Font {
+		private HashMap<Character, Form[]> font;
+		private MainWindowSettings settings;
+		private boolean useDefaultFont;
+		private File fontFile;
+
+		public Font(MainWindowSettings settings) {
+			this.settings = settings;
+		}
+
+		public static Font loadInitialFont(MainWindowSettings settings) {
+			Font font = new Font(settings);
+			
+			font.useDefaultFont = settings.getBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
+			font.fontFile = settings.getFile(MainWindowSettings.ValueKey.FontFile, null);
+			
+			if (!font.fontFile.isFile())
+				font.fontFile = null;
+			
+			if (font.useDefaultFont || font.fontFile==null)
+				font.loadDefaultFont();
+			else
+				font.loadFont(font.fontFile);
+			
+			return font;
+		}
+
+		void loadFont(File file) {
+			if (file==null || !file.isFile()) return;
+			settings.putBool  (MainWindowSettings.ValueKey.UseDefaultFont, false);
+			settings.putFile(MainWindowSettings.ValueKey.FontFile, file);
+			font = AlphaCharIO.readAlphaCharFontFromFile(file, null, true);
+			fontFile = file;
+			useDefaultFont = false;
+		}
+
+		void loadDefaultFont() {
+			settings.putBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
+			font = AlphaCharIO.readDefaultAlphaCharFont(null,true);
+			fontFile = null;
+			useDefaultFont = true;
+		}
+		
 	}
 	
 	private static class TextChangeListener implements CaretListener {
@@ -822,9 +841,11 @@ public class BumpMappingTest {
 		private double lineHeight_px;
 		private final AlphaCharSquence alphaCharSquence;
 		private final BentCartExtra bender;
+		private HashMap<Character, Form[]> font;
 
-		public PolarTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px) {
+		public PolarTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
 			super(gui,settings);
+			this.font = font;
 			this.text            = settings.getString(MainWindowSettings.ValueKey.Polar_Text        , text           );
 			this.radius_px       = settings.getDouble(MainWindowSettings.ValueKey.Polar_Radius      , radius_px      );
 			this.radiusOffset_px = settings.getDouble(MainWindowSettings.ValueKey.Polar_RadiusOffset, radiusOffset_px);
@@ -833,7 +854,7 @@ public class BumpMappingTest {
 			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineWidth   , lineWidth_px   );
 			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineHeight  , lineHeight_px  );
 			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
-			alphaCharSquence = new AlphaCharSquence(0,-this.radiusOffset_px, this.fontSize_px/100, profile, this.text, font);
+			alphaCharSquence = new AlphaCharSquence(0,-this.radiusOffset_px, this.fontSize_px/100, profile, this.text, this.font);
 			bender = new BentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, alphaCharSquence);
 		}
 
@@ -897,9 +918,11 @@ public class BumpMappingTest {
 		private double lineHeight_px;
 		private final AlphaCharSquence alphaCharSquence;
 		private final SpiralBentCartExtra bender;
+		private HashMap<Character, Form[]> font;
 
-		public SpiralTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double rowHeight_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px) {
+		public SpiralTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double rowHeight_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
 			super(gui,settings);
+			this.font = font;
 			this.text            = settings.getString(MainWindowSettings.ValueKey.Spiral_Text        , text           );
 			this.fontSize_px     = settings.getDouble(MainWindowSettings.ValueKey.Spiral_FontSize    , fontSize_px    );
 			this.radius_px       = settings.getDouble(MainWindowSettings.ValueKey.Spiral_Radius      , radius_px      );
@@ -909,7 +932,7 @@ public class BumpMappingTest {
 			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Spiral_LineWidth   , lineWidth_px   );
 			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Spiral_LineHeight  , lineHeight_px  );
 			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
-			alphaCharSquence = new AlphaCharSquence(0,1.5*this.lineWidth_px, this.fontSize_px/100, profile, this.text, font);
+			alphaCharSquence = new AlphaCharSquence(0,1.5*this.lineWidth_px, this.fontSize_px/100, profile, this.text, this.font);
 			bender = new SpiralBentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, this.rowHeight_px, this.radiusOffset_px, alphaCharSquence);
 		}
 
@@ -972,9 +995,11 @@ public class BumpMappingTest {
 		private double lineHeight_px;
 		private final AlphaCharSquence alphaCharSquence;
 		private final Centerer centerer;
+		private HashMap<Character, Form[]> font;
 		
-		CartTextOverlay(GUI gui, MainWindowSettings settings, String text, double textPosX_px, double textPosY_px, double fontSize_px, double lineWidth_px, double lineHeight_px) {
+		CartTextOverlay(GUI gui, MainWindowSettings settings, String text, double textPosX_px, double textPosY_px, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
 			super(gui,settings);
+			this.font = font;
 			this.text           = settings.getString(MainWindowSettings.ValueKey.Cart_Text      , text         );
 			this.textPosX_px    = settings.getDouble(MainWindowSettings.ValueKey.Cart_TextPosX  , textPosX_px  );
 			this.textPosY_px    = settings.getDouble(MainWindowSettings.ValueKey.Cart_TextPosY  , textPosY_px  );
@@ -982,7 +1007,7 @@ public class BumpMappingTest {
 			this.lineWidth_px   = settings.getDouble(MainWindowSettings.ValueKey.Cart_LineWidth , lineWidth_px );
 			this.lineHeight_px  = settings.getDouble(MainWindowSettings.ValueKey.Cart_LineHeight, lineHeight_px);
 			ProfileXY profile = createProfile(this.lineWidth_px, this.lineHeight_px);
-			alphaCharSquence = new AlphaCharSquence(this.textPosX_px, this.textPosY_px, this.fontSize_px/100, profile, this.text, font);
+			alphaCharSquence = new AlphaCharSquence(this.textPosX_px, this.textPosY_px, this.fontSize_px/100, profile, this.text, this.font);
 			centerer = new Centerer(alphaCharSquence);
 		}
 
