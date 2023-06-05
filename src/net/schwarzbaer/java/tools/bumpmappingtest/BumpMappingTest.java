@@ -41,33 +41,33 @@ import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.CaretEvent;
 import javax.swing.event.CaretListener;
 
-import net.schwarzbaer.gui.BumpmappingSunControl;
-import net.schwarzbaer.gui.Canvas;
-import net.schwarzbaer.gui.FileChooser;
-import net.schwarzbaer.gui.HSColorChooser;
-import net.schwarzbaer.gui.ProgressDialog;
-import net.schwarzbaer.gui.StandardMainWindow;
-import net.schwarzbaer.image.alphachar.AlphaCharIO;
-import net.schwarzbaer.image.alphachar.Form;
-import net.schwarzbaer.image.bumpmapping.BumpMapping;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Indexer;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.OverSampling;
-import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
-import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Cart.AlphaCharSquence;
-import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Centerer;
-import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Polar.BentCartExtra;
-import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction.Polar.SpiralBentCartExtra;
-import net.schwarzbaer.image.bumpmapping.NormalFunction;
-import net.schwarzbaer.image.bumpmapping.ProfileXY;
-import net.schwarzbaer.image.bumpmapping.Shading;
-import net.schwarzbaer.image.bumpmapping.Shading.GUISurfaceShading;
-import net.schwarzbaer.image.bumpmapping.Shading.MaterialShading;
-import net.schwarzbaer.image.bumpmapping.Shading.MixedShading;
-import net.schwarzbaer.image.bumpmapping.Shading.NormalImage;
-import net.schwarzbaer.system.ClipboardTools;
-import net.schwarzbaer.system.Settings;
+import net.schwarzbaer.java.lib.gui.BumpmappingSunControl;
+import net.schwarzbaer.java.lib.gui.Canvas;
+import net.schwarzbaer.java.lib.gui.FileChooser;
+import net.schwarzbaer.java.lib.gui.HSColorChooser;
+import net.schwarzbaer.java.lib.gui.ProgressDialog;
+import net.schwarzbaer.java.lib.gui.StandardMainWindow;
+import net.schwarzbaer.java.lib.image.alphachar.AlphaCharIO;
+import net.schwarzbaer.java.lib.image.alphachar.Form;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping;
+import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction;
+import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction;
+import net.schwarzbaer.java.lib.image.bumpmapping.ProfileXY;
+import net.schwarzbaer.java.lib.image.bumpmapping.Shading;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping.Indexer;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping.Normal;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping.NormalXY;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping.OverSampling;
+import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction.Centerer;
+import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction.Cart.AlphaCharSquence;
+import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction.Polar.BentCartExtra;
+import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction.Polar.SpiralBentCartExtra;
+import net.schwarzbaer.java.lib.image.bumpmapping.Shading.GUISurfaceShading;
+import net.schwarzbaer.java.lib.image.bumpmapping.Shading.MaterialShading;
+import net.schwarzbaer.java.lib.image.bumpmapping.Shading.MixedShading;
+import net.schwarzbaer.java.lib.image.bumpmapping.Shading.NormalImage;
+import net.schwarzbaer.java.lib.system.ClipboardTools;
+import net.schwarzbaer.java.lib.system.Settings;
 
 public class BumpMappingTest {
 
@@ -81,8 +81,8 @@ public class BumpMappingTest {
 	@SuppressWarnings("unused")
 	private static void testRotZ(double x, double y, double z, double w_degree) {
 		Normal n = new Normal(x,y,z);
-		System.out.printf(Locale.ENGLISH, "%s.rotateZ(%1.1f°) -> %s%n", n, w_degree, n.rotateZ(w_degree/180*Math.PI));
-		System.out.printf(Locale.ENGLISH, "%s.rotateY(%1.1f°) -> %s%n", n, w_degree, n.rotateY(w_degree/180*Math.PI));
+		System.out.printf(Locale.ENGLISH, "%s.rotateZ(%1.1fÂ°) -> %s%n", n, w_degree, n.rotateZ(w_degree/180*Math.PI));
+		System.out.printf(Locale.ENGLISH, "%s.rotateY(%1.1fÂ°) -> %s%n", n, w_degree, n.rotateY(w_degree/180*Math.PI));
 	}
 	
 	private static class MainWindowSettings extends Settings<MainWindowSettings.ValueGroup,MainWindowSettings.ValueKey> {

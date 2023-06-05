@@ -8,15 +8,15 @@ import java.util.Random;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
-import net.schwarzbaer.image.bumpmapping.BumpMapping.Normal;
-import net.schwarzbaer.image.bumpmapping.BumpMapping.NormalXY;
-import net.schwarzbaer.image.bumpmapping.ExtraNormalFunction;
-import net.schwarzbaer.image.bumpmapping.NormalFunction;
-import net.schwarzbaer.image.bumpmapping.NormalFunction.InterpolatingNormalMap;
-import net.schwarzbaer.image.bumpmapping.NormalFunction.NormalMap;
-import net.schwarzbaer.image.bumpmapping.NormalFunction.NormalMap.NormalMapData;
-import net.schwarzbaer.image.bumpmapping.NormalFunction.Polar.RotatedProfile;
-import net.schwarzbaer.image.bumpmapping.ProfileXY;
+import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction;
+import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction;
+import net.schwarzbaer.java.lib.image.bumpmapping.ProfileXY;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping.Normal;
+import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping.NormalXY;
+import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction.InterpolatingNormalMap;
+import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction.NormalMap;
+import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction.NormalMap.NormalMapData;
+import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction.Polar.RotatedProfile;
 
 enum NormalFunctions {
 		Simple(() ->
