@@ -47,8 +47,6 @@ import net.schwarzbaer.java.lib.gui.FileChooser;
 import net.schwarzbaer.java.lib.gui.HSColorChooser;
 import net.schwarzbaer.java.lib.gui.ProgressDialog;
 import net.schwarzbaer.java.lib.gui.StandardMainWindow;
-import net.schwarzbaer.java.lib.image.alphachar.AlphaCharIO;
-import net.schwarzbaer.java.lib.image.alphachar.Form;
 import net.schwarzbaer.java.lib.image.bumpmapping.BumpMapping;
 import net.schwarzbaer.java.lib.image.bumpmapping.ExtraNormalFunction;
 import net.schwarzbaer.java.lib.image.bumpmapping.NormalFunction;
@@ -66,6 +64,8 @@ import net.schwarzbaer.java.lib.image.bumpmapping.Shading.GUISurfaceShading;
 import net.schwarzbaer.java.lib.image.bumpmapping.Shading.MaterialShading;
 import net.schwarzbaer.java.lib.image.bumpmapping.Shading.MixedShading;
 import net.schwarzbaer.java.lib.image.bumpmapping.Shading.NormalImage;
+import net.schwarzbaer.java.lib.image.linegeometry.AlphaCharIO;
+import net.schwarzbaer.java.lib.image.linegeometry.Form;
 import net.schwarzbaer.java.lib.system.ClipboardTools;
 import net.schwarzbaer.java.lib.system.Settings;
 
