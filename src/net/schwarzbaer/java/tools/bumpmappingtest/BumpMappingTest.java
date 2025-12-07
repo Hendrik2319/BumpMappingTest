@@ -507,7 +507,7 @@ public class BumpMappingTest {
 			font.useDefaultFont = settings.getBool(MainWindowSettings.ValueKey.UseDefaultFont, true);
 			font.fontFile = settings.getFile(MainWindowSettings.ValueKey.FontFile, null);
 			
-			if (!font.fontFile.isFile())
+			if (font.fontFile!=null && !font.fontFile.isFile())
 				font.fontFile = null;
 			
 			if (font.useDefaultFont || font.fontFile==null)
