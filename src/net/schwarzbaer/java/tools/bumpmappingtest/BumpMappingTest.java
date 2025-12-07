@@ -239,7 +239,7 @@ public class BumpMappingTest {
 			GBC.setGridWidth(c,1); selectionPanel.add(fontField,GBC.setGridPos(c,1,i));
 			GBC.setWeights(c,0,0); selectionPanel.add(createButton("...", (JButton b)->loadFont()),GBC.setGridPos(c,2,i));
 			
-			polarTextOverlaySwitcher = new TextOverlaySwitcher<ExtraNormalFunction.Polar>(this,settings,MainWindowSettings.ValueKey.SelectedPolarTextOverlay);
+			polarTextOverlaySwitcher = new TextOverlaySwitcher<>(this,settings,MainWindowSettings.ValueKey.SelectedPolarTextOverlay);
 			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1, font.font));
 			polarTextOverlaySwitcher.add("Spiral"  , new SpiralTextOverlay(this,settings,"MxXBabcd", 100, 15, 35, -90, 30, 5, 1, font.font));
 			polarTextOverlaySwitcherPanel = polarTextOverlaySwitcher.createPanel("Polar Text Overlay");
@@ -476,10 +476,10 @@ public class BumpMappingTest {
 		}
 
 		private <T> JComboBox<T> createComboBox(T[] values, T selectedValue, Consumer<T> valueChanged) {
-			return setComboBox(new JComboBox<T>(values), selectedValue, valueChanged);
+			return setComboBox(new JComboBox<>(values), selectedValue, valueChanged);
 		}
 		private <T> JComboBox<T> createComboBox(Vector<T> values, T selectedValue, Consumer<T> valueChanged) {
-			return setComboBox(new JComboBox<T>(values), selectedValue, valueChanged);
+			return setComboBox(new JComboBox<>(values), selectedValue, valueChanged);
 		}
 		private <T> JComboBox<T> setComboBox(JComboBox<T> comp, T selectedValue, Consumer<T> valueChanged) {
 			comp.setSelectedItem(selectedValue);
