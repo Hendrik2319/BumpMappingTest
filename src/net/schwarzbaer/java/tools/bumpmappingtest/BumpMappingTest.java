@@ -99,8 +99,8 @@ public class BumpMappingTest {
 			WindowX, WindowY, WindowWidth, WindowHeight,
 			NormalFunction, Shading, SelectedPolarTextOverlay,
 			Cart_Text, Cart_FontSize, Cart_TextPosX, Cart_TextPosY, Cart_LineWidth, Cart_LineHeight,
-			Polar_Text, Polar_FontSize, Polar_Radius, Polar_RadiusOffset, Polar_Angle, Polar_LineWidth, Polar_LineHeight,
-			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_LineWidth, Spiral_LineHeight, UseDefaultFont, FontFile, SunX, SunY, SunZ
+			Polar_Text, Polar_FontSize, Polar_Radius, Polar_RadiusOffset, Polar_Angle, Polar_AngleScale, Polar_LineWidth, Polar_LineHeight,
+			Spiral_Text, Spiral_FontSize, Spiral_Radius, Spiral_RadiusOffset, Spiral_RowHeight, Spiral_Angle, Spiral_AngleScale, Spiral_LineWidth, Spiral_LineHeight, UseDefaultFont, FontFile, SunX, SunY, SunZ
 		}
 
 		public MainWindowSettings() { super(BumpMappingTest.class); }
@@ -240,8 +240,8 @@ public class BumpMappingTest {
 			GBC.setWeights(c,0,0); selectionPanel.add(createButton("...", (JButton b)->loadFont()),GBC.setGridPos(c,2,i));
 			
 			polarTextOverlaySwitcher = new TextOverlaySwitcher<>(this,settings,MainWindowSettings.ValueKey.SelectedPolarTextOverlay);
-			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15, -90, 30, 5, 1, font.font));
-			polarTextOverlaySwitcher.add("Spiral"  , new SpiralTextOverlay(this,settings,"MxXBabcd", 100, 15, 35, -90, 30, 5, 1, font.font));
+			polarTextOverlaySwitcher.add("Circular", new  PolarTextOverlay(this,settings,"MxXBabcd", 100, 15,     -90, 1, 30, 5, 1, font.font));
+			polarTextOverlaySwitcher.add("Spiral"  , new SpiralTextOverlay(this,settings,"MxXBabcd", 100, 15, 35, -90, 1, 30, 5, 1, font.font));
 			polarTextOverlaySwitcherPanel = polarTextOverlaySwitcher.createPanel("Polar Text Overlay");
 			
 			cartTextOverlay  = new CartTextOverlay (this,settings,"MxXBabcd", -100, -50, 30, 5, 1, font.font);
@@ -836,6 +836,7 @@ public class BumpMappingTest {
 		private double radius_px;
 		private double radiusOffset_px;
 		private double angle_deg;
+		private double angleScale;
 		private double fontSize_px;
 		private double lineWidth_px;
 		private double lineHeight_px;
@@ -843,19 +844,20 @@ public class BumpMappingTest {
 		private final BentCartExtra bender;
 		private HashMap<Character, Form[]> font;
 
-		public PolarTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
+		public PolarTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double angle_deg, double angleScale, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
 			super(gui,settings);
 			this.font = font;
 			this.text            = settings.getString(MainWindowSettings.ValueKey.Polar_Text        , text           );
 			this.radius_px       = settings.getDouble(MainWindowSettings.ValueKey.Polar_Radius      , radius_px      );
 			this.radiusOffset_px = settings.getDouble(MainWindowSettings.ValueKey.Polar_RadiusOffset, radiusOffset_px);
 			this.angle_deg       = settings.getDouble(MainWindowSettings.ValueKey.Polar_Angle       , angle_deg      );
+			this.angleScale      = settings.getDouble(MainWindowSettings.ValueKey.Polar_AngleScale  , angleScale     );
 			this.fontSize_px     = settings.getDouble(MainWindowSettings.ValueKey.Polar_FontSize    , fontSize_px    );
 			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineWidth   , lineWidth_px   );
 			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Polar_LineHeight  , lineHeight_px  );
 			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
 			alphaCharSquence = new AlphaCharSquence(0,-this.radiusOffset_px, this.fontSize_px/100, profile, this.text, this.font);
-			bender = new BentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, alphaCharSquence);
+			bender = new BentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, this.angleScale, alphaCharSquence);
 		}
 
 		@Override
@@ -870,27 +872,30 @@ public class BumpMappingTest {
 
 		@Override
 		public JPanel createOptionsPanel(String title) {
+			int i;
 			GridBagConstraints c = new GridBagConstraints();
 			JPanel textPanel = new JPanel(new GridBagLayout());
 			if (title!=null) textPanel.setBorder(BorderFactory.createTitledBorder(title));
 			GBC.reset(c);
 			GBC.setFill(c, GBC.GridFill.HORIZONTAL);
-			GBC.setWeights(c,0,0);
-			textPanel.add(new JLabel("Text: "              , SwingConstants.RIGHT),GBC.setGridPos(c,0,0));
-			textPanel.add(new JLabel("Font Size (px): "    , SwingConstants.RIGHT),GBC.setGridPos(c,0,1));
-			textPanel.add(new JLabel("Radius (px): "       , SwingConstants.RIGHT),GBC.setGridPos(c,0,2));
-			textPanel.add(new JLabel("Radius Offset (px): ", SwingConstants.RIGHT),GBC.setGridPos(c,0,3));
-			textPanel.add(new JLabel("Start Angle (deg): " , SwingConstants.RIGHT),GBC.setGridPos(c,0,4));
-			textPanel.add(new JLabel("Line Width (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,5));
-			textPanel.add(new JLabel("Line Depth (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,6));
-			GBC.setWeights(c,1,0);
-			textPanel.add(gui.createTextInput  (text           , this::setText        , v->!v.isEmpty()),GBC.setGridPos(c,1,0));
-			textPanel.add(gui.createDoubleInput(fontSize_px    , this::setFontSize    , v->v>0         ),GBC.setGridPos(c,1,1));
-			textPanel.add(gui.createDoubleInput(radius_px      , this::setRadius      , v->v>0         ),GBC.setGridPos(c,1,2));
-			textPanel.add(gui.createDoubleInput(radiusOffset_px, this::setRadiusOffset, v->v>-radius_px),GBC.setGridPos(c,1,3));
-			textPanel.add(gui.createDoubleInput(angle_deg      , this::setAngle                        ),GBC.setGridPos(c,1,4));
-			textPanel.add(gui.createDoubleInput(lineWidth_px   , this::setLineWidth   , v->v>0.01      ),GBC.setGridPos(c,1,5));
-			textPanel.add(gui.createDoubleInput(lineHeight_px  , this::setLineHeight  , v->v>0.01      ),GBC.setGridPos(c,1,6));
+			GBC.setWeights(c,0,0); i=0;
+			textPanel.add(new JLabel("Text: "              , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Font Size (px): "    , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Radius (px): "       , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Radius Offset (px): ", SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Start Angle (deg): " , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Angle Scale: "       , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Line Width (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Line Depth (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			GBC.setWeights(c,1,0); i=0;
+			textPanel.add(gui.createTextInput  (text           , this::setText        , v->!v.isEmpty()),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(fontSize_px    , this::setFontSize    , v->v>0         ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(radius_px      , this::setRadius      , v->v>0         ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(radiusOffset_px, this::setRadiusOffset, v->v>-radius_px),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(angle_deg      , this::setAngle                        ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(angleScale     , this::setAngleScale  , v->v!=0        ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(lineWidth_px   , this::setLineWidth   , v->v>0.01      ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(lineHeight_px  , this::setLineHeight  , v->v>0.01      ),GBC.setGridPos(c,1,i++));
 			return textPanel;
 		}
 		
@@ -898,6 +903,7 @@ public class BumpMappingTest {
 		private void setRadius      (double radius_px      ) { this.radius_px       = setDoubleValue( this.radius_px      , radius_px      , MainWindowSettings.ValueKey.Polar_Radius      , ()->bender      .setZeroYRadius( radius_px                               ) ); }
 		private void setRadiusOffset(double radiusOffset_px) { this.radiusOffset_px = setDoubleValue( this.radiusOffset_px, radiusOffset_px, MainWindowSettings.ValueKey.Polar_RadiusOffset, ()->alphaCharSquence.setY      (-radiusOffset_px                         ) ); }
 		private void setAngle       (double angle_deg      ) { this.angle_deg       = setDoubleValue( this.angle_deg      , angle_deg      , MainWindowSettings.ValueKey.Polar_Angle       , ()->bender      .setZeroXAngle ( angle_deg*DEG2RAD                       ) ); }
+		private void setAngleScale  (double angleScale     ) { this.angleScale      = setDoubleValue( this.angleScale     , angleScale     , MainWindowSettings.ValueKey.Polar_AngleScale  , ()->bender      .setScaleXAngle( angleScale                              ) ); }
 		private void setFontSize    (double fontSize_px    ) { this.fontSize_px     = setDoubleValue( this.fontSize_px    , fontSize_px    , MainWindowSettings.ValueKey.Polar_FontSize    , ()->alphaCharSquence.setScale  ( fontSize_px/100                         ) ); }
 		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , MainWindowSettings.ValueKey.Polar_LineWidth   , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
 		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , MainWindowSettings.ValueKey.Polar_LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
@@ -914,13 +920,14 @@ public class BumpMappingTest {
 		private double radiusOffset_px;
 		private double rowHeight_px;
 		private double angle_deg;
+		private double angleScale;
 		private double lineWidth_px;
 		private double lineHeight_px;
 		private final AlphaCharSquence alphaCharSquence;
 		private final SpiralBentCartExtra bender;
 		private HashMap<Character, Form[]> font;
 
-		public SpiralTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double rowHeight_px, double angle_deg, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
+		public SpiralTextOverlay(GUI gui, MainWindowSettings settings, String text, double radius_px, double radiusOffset_px, double rowHeight_px, double angle_deg, double angleScale, double fontSize_px, double lineWidth_px, double lineHeight_px, HashMap<Character, Form[]> font) {
 			super(gui,settings);
 			this.font = font;
 			this.text            = settings.getString(MainWindowSettings.ValueKey.Spiral_Text        , text           );
@@ -929,11 +936,12 @@ public class BumpMappingTest {
 			this.radiusOffset_px = settings.getDouble(MainWindowSettings.ValueKey.Spiral_RadiusOffset, radiusOffset_px);
 			this.rowHeight_px    = settings.getDouble(MainWindowSettings.ValueKey.Spiral_RowHeight   , rowHeight_px   );
 			this.angle_deg       = settings.getDouble(MainWindowSettings.ValueKey.Spiral_Angle       , angle_deg      );
+			this.angleScale      = settings.getDouble(MainWindowSettings.ValueKey.Spiral_AngleScale  , angleScale     );
 			this.lineWidth_px    = settings.getDouble(MainWindowSettings.ValueKey.Spiral_LineWidth   , lineWidth_px   );
 			this.lineHeight_px   = settings.getDouble(MainWindowSettings.ValueKey.Spiral_LineHeight  , lineHeight_px  );
 			ProfileXY profile = createProfile(this.lineWidth_px,this.lineHeight_px);
 			alphaCharSquence = new AlphaCharSquence(0,1.5*this.lineWidth_px, this.fontSize_px/100, profile, this.text, this.font);
-			bender = new SpiralBentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, this.rowHeight_px, this.radiusOffset_px, alphaCharSquence);
+			bender = new SpiralBentCartExtra(this.radius_px, this.angle_deg*DEG2RAD, this.angleScale, this.rowHeight_px, this.radiusOffset_px, alphaCharSquence);
 		}
 
 		@Override
@@ -961,6 +969,7 @@ public class BumpMappingTest {
 			textPanel.add(new JLabel("Radius Offset (px): ", SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
 			textPanel.add(new JLabel("Row Height (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
 			textPanel.add(new JLabel("Start Angle (deg): " , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
+			textPanel.add(new JLabel("Angle Scale: "       , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
 			textPanel.add(new JLabel("Line Width (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
 			textPanel.add(new JLabel("Line Depth (px): "   , SwingConstants.RIGHT),GBC.setGridPos(c,0,i++));
 			GBC.setWeights(c,1,0); i = 0;
@@ -970,6 +979,7 @@ public class BumpMappingTest {
 			textPanel.add(gui.createDoubleInput(radiusOffset_px, this::setRadiusOffset, v->v>-radius_px   ),GBC.setGridPos(c,1,i++));
 			textPanel.add(gui.createDoubleInput(rowHeight_px   , this::setRowHeight   , v->v>fontSize_px/4),GBC.setGridPos(c,1,i++));
 			textPanel.add(gui.createDoubleInput(angle_deg      , this::setAngle                           ),GBC.setGridPos(c,1,i++));
+			textPanel.add(gui.createDoubleInput(angleScale     , this::setAngleScale  , v->v!=0           ),GBC.setGridPos(c,1,i++));
 			textPanel.add(gui.createDoubleInput(lineWidth_px   , this::setLineWidth   , v->v>0.01         ),GBC.setGridPos(c,1,i++));
 			textPanel.add(gui.createDoubleInput(lineHeight_px  , this::setLineHeight  , v->v>0.01         ),GBC.setGridPos(c,1,i++));
 			return textPanel;
@@ -981,6 +991,7 @@ public class BumpMappingTest {
 		private void setRadiusOffset(double radiusOffset_px) { this.radiusOffset_px = setDoubleValue( this.radiusOffset_px, radiusOffset_px, MainWindowSettings.ValueKey.Spiral_RadiusOffset, ()->bender     .setRadiusOffset( radiusOffset_px                         ) ); }
 		private void setRowHeight   (double rowHeight_px   ) { this.rowHeight_px    = setDoubleValue( this.rowHeight_px   , rowHeight_px   , MainWindowSettings.ValueKey.Spiral_RowHeight   , ()->bender     .setRowHeight   ( rowHeight_px                            ) ); }
 		private void setAngle       (double angle_deg      ) { this.angle_deg       = setDoubleValue( this.angle_deg      , angle_deg      , MainWindowSettings.ValueKey.Spiral_Angle       , ()->bender     .setZeroXAngle  ( angle_deg*DEG2RAD                       ) ); }
+		private void setAngleScale  (double angleScale     ) { this.angleScale      = setDoubleValue( this.angleScale     , angleScale     , MainWindowSettings.ValueKey.Spiral_AngleScale  , ()->bender     .setScaleXAngle ( angleScale                              ) ); }
 		private void setLineWidth   (double lineWidth_px   ) { this.lineWidth_px    = setDoubleValue( this.lineWidth_px   , lineWidth_px   , MainWindowSettings.ValueKey.Spiral_LineWidth   , ()->{ alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)); alphaCharSquence.setY(1.5*lineWidth_px); } ); }
 		private void setLineHeight  (double lineHeight_px  ) { this.lineHeight_px   = setDoubleValue( this.lineHeight_px  , lineHeight_px  , MainWindowSettings.ValueKey.Spiral_LineHeight  , ()->alphaCharSquence.setProfile(createProfile(lineWidth_px,lineHeight_px)) ); }
 	}
